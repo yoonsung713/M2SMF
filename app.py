@@ -88,7 +88,7 @@ def main():
 
     # 작업 완료 체크
     if st.session_state.current_index >= total_images:
-        st.success("🎉 모든 이미지 라벨링이 완료되었습니다! 수고하셨습니다.")
+        st.success("모든 이미지 라벨링이 완료되었습니다. 감사합니다!")
         st.balloons()
         return
 
@@ -108,10 +108,10 @@ def main():
 
     # 입력 폼
     with st.form(key='labeling_form', clear_on_submit=True): # clear_on_submit: 제출 후 비고란 비우기
-        st.write("### 이 이미지에 대한 판단은?")
+        st.write("이 이미지에 대해 판단해주세요")
         
-        options = ["옵션 A (정상)", "옵션 B (불량)", "옵션 C (애매함)", "옵션 D (기타)"]
-        choice = st.radio("하나를 선택하세요:", options)
+        options = ["옵션 A (실제 이미지)", "옵션 B (품질이 낮은 합성 이미지)", "옵션 C (품질이 높은 합성 이미지)"]
+        choice = st.radio("하나를 선택해주세요:", options)
         
         note = st.text_input("비고 (선택사항):")
         
@@ -138,3 +138,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
