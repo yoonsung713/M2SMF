@@ -117,20 +117,20 @@ def main():
         # 1. 퀄리티 등급 (Quality)
         st.markdown("**1. 합성 퀄리티 등급**")
         quality_options = [
-            "High Quality - 언뜻 보면 실제와 구분이 어려움",
-            "Low Quality - 합성인 것이 명확히 드러남"
+            "1. High Quality - 언뜻 보면 실제와 구분이 어려움",
+            "2. Low Quality - 합성인 것이 명확히 드러남"
         ]
         quality_choice = st.radio("전반적인 완성도는 어떤가요?", quality_options, index=0)
 
         # 2. 합성 판단 요인 (Reason)
         st.markdown("**2. 합성이라고 판단한 주된 요인 (가장 큰 결함)**")
         defect_options = [
-            "해부학적 구조 오류 (뼈/장기의 위치나 모양이 비현실적)",
-            "질감 및 노이즈 이상 (지나치게 매끄럽거나 거친 패턴)",
-            "음영/대조 부조화 (그림자나 밝기가 주변과 맞지 않음)",
-            "경계선 아티팩트 (배경과 분리되어 보이거나 끊김)",
-            "기괴한 형체/미지의 패턴 (Unknown Artifacts)",
-            "기타 (아래에 상세 기술)"
+            "A. 해부학적 구조 오류 (뼈/장기의 위치나 모양이 비현실적)",
+            "B. 질감 및 노이즈 이상 (지나치게 매끄럽거나 거친 패턴)",
+            "C. 음영/대조 부조화 (그림자나 밝기가 주변과 맞지 않음)",
+            "D. 경계선 아티팩트 (배경과 분리되어 보이거나 끊김)",
+            "E. 기괴한 형체/미지의 패턴 (Unknown Artifacts)",
+            "F. 기타 (아래에 상세 기술)"
         ]
         defect_choice = st.radio("어느 부분이 가장 어색한가요?", defect_options)
 
@@ -172,3 +172,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
