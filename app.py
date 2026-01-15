@@ -98,11 +98,8 @@ def main():
     st.image(current_image_path, caption=image_name, use_container_width=True)
 
     # ---------------------------------------------------------
-    # [수정됨] 체크박스 형태의 입력 폼
+    # 입력 폼
     # ---------------------------------------------------------
-    
-    # 중요: clear_on_submit=False로 설정하여 유효성 검사 실패 시 내용이 유지되게 함
-    # 대신 이미지 변경 시 key를 바꿔서 강제 초기화 효과를 냄
     with st.form(key=f'labeling_form_{image_name}'):
         st.subheader("📝 합성 판단 근거 (Checklist)")
         st.info("해당하는 항목을 모두 체크해주세요.")
@@ -134,44 +131,42 @@ def main():
         
         st.markdown("**이상 소견 선택:**")
         for option in defect_options:
-            # Key에 image_name을 포함시켜 이미지가 바뀌면 자동으로 초기화되게 함
             unique_key = f"{option}_{image_name}"
             if st.checkbox(option, key=unique_key):
                 selected_defects.append(option)
 
         st.markdown("---")
 
-        # 상세 판독문 (Description)
+        # 상세 판독문
         st.markdown("**상세 판독 (Description)**")
         detail_note = st.text_area(
             "선택한 항목에 대한 구체적인 설명이나 '기타' 사유를 적어주세요.",
             height=80,
             placeholder="예: 우측 늑골 끊김 관찰됨. ('기타' 선택 시 필수 작성)",
-            key=f"note_{image_name}"  # 텍스트 박스도 이미지별로 초기화
+            key=f"note_{image_name}"
         )
         
         # 제출 버튼
         submit_button = st.form_submit_button(label="판독 결과 저장하고 다음으로 >", type="primary")
 
-    # 저장 로직 및 유효성 검사
+    # ---------------------------------------------------------
+    # [수정됨] 저장 로직 및 유효성 검사 (순서 중요)
+    # ---------------------------------------------------------
     if submit_button:
-        # 1. [유효성 검사] 기타가 선택되었는데 내용이 없는 경우
-        is_other_selected = any("기타" in opt for opt in selected_defects)
-        
-        if is_other_selected and not detail_note.strip():
-            st.error("⚠️ '기타' 항목을 선택하셨습니다. 상세 판독문에 사유를 작성해주세요.")
-        
-        # 2. [유효성 검사] 아무것도 선택하지 않은 경우 (선택사항, 필요 없으면 주석 처리)
-        # elif not selected_defects:
-        #    st.warning("⚠️ 최소 하나의 항목을 선택해주세요.")
+        # 1. 아무것도 선택하지 않은 경우 체크 (이 부분이 추가되었습니다!)
+        if not selected_defects:
+            st.error("⚠️ 최소한 하나 이상의 항목을 선택해야 합니다.")
 
+        # 2. '기타'를 선택했는데 내용이 없는 경우 체크
+        elif any("기타" in opt for opt in selected_defects) and not detail_note.strip():
+            st.error("⚠️ '기타' 항목을 선택하셨습니다. 상세 판독문에 사유를 작성해주세요.")
+
+        # 3. 모든 조건을 통과했을 때만 저장
         else:
-            # 3. 저장 진행
             try:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
-                # 체크된 리스트를 문자열로 변환
-                defects_str = ", ".join(selected_defects) if selected_defects else "None"
+                defects_str = ", ".join(selected_defects)
                 
                 row_data = [
                     timestamp, 
@@ -185,7 +180,6 @@ def main():
                 
                 st.toast(f"저장 완료! ({image_name})")
                 
-                # 다음 이미지로 이동 (index 증가 -> rerun -> image_name 변경 -> key 변경 -> 초기화)
                 st.session_state.current_index += 1
                 st.rerun()
                 
@@ -194,4 +188,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
