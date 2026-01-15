@@ -100,12 +100,14 @@ def main():
     # ---------------------------------------------------------
     # [수정됨] 체크박스 형태의 입력 폼
     # ---------------------------------------------------------
-    # 주의: 유효성 검사 실패 시 입력값이 사라지지 않도록 clear_on_submit=False로 설정(기본값)
-    with st.form(key='labeling_form'): 
+    
+    # 중요: clear_on_submit=False로 설정하여 유효성 검사 실패 시 내용이 유지되게 함
+    # 대신 이미지 변경 시 key를 바꿔서 강제 초기화 효과를 냄
+    with st.form(key=f'labeling_form_{image_name}'):
         st.subheader("📝 합성 판단 근거 (Checklist)")
         st.info("해당하는 항목을 모두 체크해주세요.")
 
-        # 옵션 리스트 정의 (기타 추가됨)
+        # 옵션 리스트 정의
         defect_options = [
             # 1. Texture / Global Artifacts
             "[노이즈/질감] 전반적인 해상도 저하, 픽셀 깨짐, 또는 이질적인 질감 (Noise/Texture)",
@@ -121,7 +123,7 @@ def main():
             # 3. Lung / Fine Patterns
             "[폐] 폐 혈관상(Vascular markings)의 소실 또는 뭉개짐(Blur)",
             "[폐] 폐 실질 내 해부학적으로 불가능한 혈관 주행/분지 (Vessel Path)",
-            "[폐] 폐의 비정상적인 음 (Abnormal Patterns)",
+            "[폐] 폐의 비정상적인 음영 (Abnormal Patterns)",
             
             # 4. Others
             "기타 (아래 상세 판독문에 내용을 적어주세요)"
@@ -129,10 +131,12 @@ def main():
 
         # 체크박스 생성 루프
         selected_defects = []
-        st.markdown("**이상 소견 선택:**")
         
+        st.markdown("**이상 소견 선택:**")
         for option in defect_options:
-            if st.checkbox(option, key=option):
+            # Key에 image_name을 포함시켜 이미지가 바뀌면 자동으로 초기화되게 함
+            unique_key = f"{option}_{image_name}"
+            if st.checkbox(option, key=unique_key):
                 selected_defects.append(option)
 
         st.markdown("---")
@@ -142,23 +146,27 @@ def main():
         detail_note = st.text_area(
             "선택한 항목에 대한 구체적인 설명이나 '기타' 사유를 적어주세요.",
             height=80,
-            placeholder="예: 우측 늑골 끊김 관찰됨. (기타 선택 시 필수 작성)"
+            placeholder="예: 우측 늑골 끊김 관찰됨. ('기타' 선택 시 필수 작성)",
+            key=f"note_{image_name}"  # 텍스트 박스도 이미지별로 초기화
         )
         
         # 제출 버튼
         submit_button = st.form_submit_button(label="판독 결과 저장하고 다음으로 >", type="primary")
 
-    # 저장 로직 및 유효성 검사 (Validation)
+    # 저장 로직 및 유효성 검사
     if submit_button:
-        # [추가된 로직] 유효성 검사: 기타 선택 시 내용 필수 확인
-        other_option_str = "기타 (아래 상세 판독문에 내용을 적어주세요)"
-        is_other_selected = other_option_str in selected_defects
-        is_note_empty = not detail_note.strip() # 공백 제거 후 확인
+        # 1. [유효성 검사] 기타가 선택되었는데 내용이 없는 경우
+        is_other_selected = any("기타" in opt for opt in selected_defects)
+        
+        if is_other_selected and not detail_note.strip():
+            st.error("⚠️ '기타' 항목을 선택하셨습니다. 상세 판독문에 사유를 반드시 작성해주세요.")
+        
+        # 2. [유효성 검사] 아무것도 선택하지 않은 경우 (선택사항, 필요 없으면 주석 처리)
+        # elif not selected_defects:
+        #    st.warning("⚠️ 최소 하나의 항목을 선택해주세요.")
 
-        if is_other_selected and is_note_empty:
-            st.error("🚨 '기타' 항목을 선택하셨습니다. 상세 판독문에 구체적인 사유를 작성해주세요.")
         else:
-            # 검사 통과 시 저장 진행
+            # 3. 저장 진행
             try:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
@@ -177,7 +185,7 @@ def main():
                 
                 st.toast(f"저장 완료! ({image_name})")
                 
-                # 인덱스 증가 및 페이지 새로고침
+                # 다음 이미지로 이동 (index 증가 -> rerun -> image_name 변경 -> key 변경 -> 초기화)
                 st.session_state.current_index += 1
                 st.rerun()
                 
