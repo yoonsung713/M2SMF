@@ -100,9 +100,9 @@ def main():
     # [추가됨] 폴더명에 따른 안내 메시지 표시
     # ---------------------------------------------------------
     if folder_name == "roentgen_10_440":
-        st.warning("📉 **참고:** 이 이미지는 **Low Quality Data**입니다.", icon="⚠️")
+        st.warning("**참고:** 이 이미지는 **Low Quality 합성 이미지**입니다.")
     elif folder_name == "roentgen_75_440":
-        st.success("📈 **참고:** 이 이미지는 **High Quality Data**입니다.", icon="✅")
+        st.success("**참고:** 이 이미지는 **High Quality 합성 이미지**입니다.")
     
     # 이미지 표시
     st.image(current_image_path, caption=image_name, use_container_width=True)
@@ -188,3 +188,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
