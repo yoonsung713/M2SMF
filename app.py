@@ -100,7 +100,8 @@ def main():
     # ---------------------------------------------------------
     # [수정됨] 체크박스 형태의 입력 폼
     # ---------------------------------------------------------
-    with st.form(key='labeling_form', clear_on_submit=True):
+    # 주의: 유효성 검사 실패 시 입력값이 사라지지 않도록 clear_on_submit=False로 설정(기본값)
+    with st.form(key='labeling_form'): 
         st.subheader("📝 합성 판단 근거 (Checklist)")
         st.info("해당하는 항목을 모두 체크해주세요.")
 
@@ -126,14 +127,11 @@ def main():
             "기타 (아래 상세 판독문에 내용을 적어주세요)"
         ]
 
-        # [변경점] 체크박스 생성 루프
-        # 선택된 항목들을 담을 리스트
+        # 체크박스 생성 루프
         selected_defects = []
-        
         st.markdown("**이상 소견 선택:**")
+        
         for option in defect_options:
-            # 각 옵션마다 체크박스 생성
-            # value=False는 기본적으로 체크 해제 상태
             if st.checkbox(option, key=option):
                 selected_defects.append(option)
 
@@ -144,38 +142,47 @@ def main():
         detail_note = st.text_area(
             "선택한 항목에 대한 구체적인 설명이나 '기타' 사유를 적어주세요.",
             height=80,
-            placeholder="예: 우측 늑골 끊김 관찰됨."
+            placeholder="예: 우측 늑골 끊김 관찰됨. (기타 선택 시 필수 작성)"
         )
         
         # 제출 버튼
         submit_button = st.form_submit_button(label="판독 결과 저장하고 다음으로 >", type="primary")
 
-    # 저장 로직
+    # 저장 로직 및 유효성 검사 (Validation)
     if submit_button:
-        try:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
-            # 체크된 리스트를 문자열로 변환
-            defects_str = ", ".join(selected_defects) if selected_defects else "None"
-            
-            row_data = [
-                timestamp, 
-                folder_name, 
-                image_name, 
-                defects_str, 
-                detail_note
-            ]
-            
-            sheet.append_row(row_data)
-            
-            st.toast(f"저장 완료! ({image_name})")
-            
-            st.session_state.current_index += 1
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"저장 중 오류가 발생했습니다: {e}")
+        # [추가된 로직] 유효성 검사: 기타 선택 시 내용 필수 확인
+        other_option_str = "기타 (아래 상세 판독문에 내용을 적어주세요)"
+        is_other_selected = other_option_str in selected_defects
+        is_note_empty = not detail_note.strip() # 공백 제거 후 확인
+
+        if is_other_selected and is_note_empty:
+            st.error("🚨 '기타' 항목을 선택하셨습니다. 상세 판독문에 구체적인 사유를 작성해주세요.")
+        else:
+            # 검사 통과 시 저장 진행
+            try:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                # 체크된 리스트를 문자열로 변환
+                defects_str = ", ".join(selected_defects) if selected_defects else "None"
+                
+                row_data = [
+                    timestamp, 
+                    folder_name, 
+                    image_name, 
+                    defects_str, 
+                    detail_note
+                ]
+                
+                sheet.append_row(row_data)
+                
+                st.toast(f"저장 완료! ({image_name})")
+                
+                # 인덱스 증가 및 페이지 새로고침
+                st.session_state.current_index += 1
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"저장 중 오류가 발생했습니다: {e}")
 
 if __name__ == "__main__":
     main()
-
