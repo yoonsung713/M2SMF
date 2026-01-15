@@ -159,7 +159,7 @@ def main():
         is_other_selected = any("기타" in opt for opt in selected_defects)
         
         if is_other_selected and not detail_note.strip():
-            st.error("⚠️ '기타' 항목을 선택하셨습니다. 상세 판독문에 사유를 반드시 작성해주세요.")
+            st.error("⚠️ '기타' 항목을 선택하셨습니다. 상세 판독문에 사유를 작성해주세요.")
         
         # 2. [유효성 검사] 아무것도 선택하지 않은 경우 (선택사항, 필요 없으면 주석 처리)
         # elif not selected_defects:
@@ -194,3 +194,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
