@@ -107,20 +107,20 @@ def main():
         # 옵션 리스트 정의 (기타 추가됨)
         defect_options = [
             # 1. Texture / Global Artifacts
-            "[v_tex] 전반적인 해상도 저하, 픽셀 깨짐, 또는 이질적인 질감 (Noise/Texture)",
-            "[v_tex] 텍스트(L/R 마커) 뭉개짐, 또는 배경의 정체불명 아티팩트 (Artifacts)",
-            "[v_tex] 경계면(피부/배경)이 부자연스럽게 분리되거나 섞임 (Boundary)",
+            "[노이즈/질감] 전반적인 해상도 저하, 픽셀 깨짐, 또는 이질적인 질감 (Noise/Texture)",
+            "[노이즈/질감] 텍스트(L/R 마커) 뭉개짐, 또는 배경의 정체불명 아티팩트 (Artifacts)",
+            "[노이즈/질감] 경계면(피부/배경)이 부자연스럽게 분리되거나 섞임 (Boundary)",
 
             # 2. Anatomy / Structure
-            "[v_anat] 늑골(Rib)의 개수 오류, 융합, 끊김 현상 (Skeletal-Ribs)",
-            "[v_anat] 쇄골/견갑골/척추의 좌우 비대칭 또는 기형 (Skeletal-General)",
-            "[v_anat] 심장/횡격막의 위치나 모양이 비현실적임 (Organs)",
-            "[v_anat] 투과도(Penetration) 물리 법칙 오류 (뼈와 장기의 밝기 부조화)",
+            "[해부학] 늑골(Rib)의 개수 오류, 융합, 끊김 현상 (Skeletal-Ribs)",
+            "[해부학] 쇄골/견갑골/척추의 좌우 비대칭 또는 기형 (Skeletal-General)",
+            "[해부학] 심장/횡격막의 위치나 모양이 비현실적임 (Organs)",
+            "[해부학] 투과도(Penetration) 물리 법칙 오류 (뼈와 장기의 밝기 부조화)",
 
             # 3. Lung / Fine Patterns
-            "[v_lung] 폐 혈관상(Vascular markings)의 소실 또는 뭉개짐(Blur)",
-            "[v_lung] 폐 실질 내 해부학적으로 불가능한 혈관 주행/분지 (Vessel Path)",
-            "[v_lung] 폐야 내 설명 불가능한 이상 음영 패턴 (Abnormal Patterns)",
+            "[폐] 폐 혈관상(Vascular markings)의 소실 또는 뭉개짐(Blur)",
+            "[폐] 폐 실질 내 해부학적으로 불가능한 혈관 주행/분지 (Vessel Path)",
+            "[폐] 폐의 비정상적인 음 (Abnormal Patterns)",
             
             # 4. Others
             "기타 (아래 상세 판독문에 내용을 적어주세요)"
@@ -144,7 +144,7 @@ def main():
         detail_note = st.text_area(
             "선택한 항목에 대한 구체적인 설명이나 '기타' 사유를 적어주세요.",
             height=80,
-            placeholder="예: 우측 늑골 끊김 관찰됨. (기타 선택 시 필수 작성)"
+            placeholder="예: 우측 늑골 끊김 관찰됨."
         )
         
         # 제출 버튼
@@ -178,3 +178,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
