@@ -4,8 +4,8 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
-# 1. 페이지 설정
-st.set_page_config(page_title="합성 CXR 판독 도구", layout="centered")
+# 1. 페이지 설정 (레이아웃을 'wide'로 변경하여 가로 공간 확보)
+st.set_page_config(page_title="합성 CXR 판독 도구", layout="wide") 
 
 # 2. Google Sheets 연결 함수
 def get_google_sheet():
@@ -97,64 +97,75 @@ def main():
     st.caption(f"진행 상황: {current_idx + 1} / {total_images} | 폴더: {folder_name}")
 
     # ---------------------------------------------------------
-    # [추가됨] 폴더명에 따른 안내 메시지 표시
+    # [레이아웃 변경] 좌우 분할 (1:1 비율)
     # ---------------------------------------------------------
-    if folder_name == "roentgen_10_440":
-        st.warning("**참고:** 이 이미지는 **Low Quality 합성 이미지**입니다.")
-    elif folder_name == "roentgen_75_440":
-        st.success("**참고:** 이 이미지는 **High Quality 합성 이미지**입니다.")
-    
-    # 이미지 표시
-    st.image(current_image_path, caption=image_name, use_container_width=True)
+    col1, col2 = st.columns([1, 1]) # 왼쪽(이미지), 오른쪽(폼)
 
-    # ---------------------------------------------------------
-    # 입력 폼
-    # ---------------------------------------------------------
-    with st.form(key=f'labeling_form_{image_name}'):
-        st.subheader("📝 합성 판단 근거 (Checklist)")
-        st.info("해당하는 항목을 모두 체크해주세요.")
+    # --- 왼쪽 컬럼: 이미지 표시 ---
+    with col1:
+        if folder_name == "roentgen_10_440":
+            st.warning("⚠️ **Low Quality** 합성 이미지")
+        elif folder_name == "roentgen_75_440":
+            st.success("✅ **High Quality** 합성 이미지")
+        
+        # 이미지 꽉 채워서 표시
+        st.image(current_image_path, caption=image_name, use_container_width=True)
 
-        defect_options = [
-            # 1. Texture
-            "[노이즈/질감] 전반적인 해상도 저하, 픽셀 깨짐, 또는 이질적인 질감 (Noise/Texture)",
-            "[노이즈/질감] 텍스트(L/R 마커) 뭉개짐, 또는 배경의 정체불명 아티팩트 (Artifacts)",
-            "[노이즈/질감] 경계면(피부/배경)이 부자연스럽게 분리되거나 섞임 (Boundary)",
+    # --- 오른쪽 컬럼: 입력 폼 ---
+    with col2:
+        with st.form(key=f'labeling_form_{image_name}'):
+            st.subheader("📝 합성 판단 근거")
+            # st.info("해당하는 항목을 모두 체크해주세요.") # 공간 절약을 위해 생략 가능
 
-            # 2. Anatomy
-            "[해부학] 늑골(Rib)의 개수 오류, 융합, 끊김 현상 (Skeletal-Ribs)",
-            "[해부학] 쇄골/견갑골/척추의 좌우 비대칭 또는 기형 (Skeletal-General)",
-            "[해부학] 심장/횡격막의 위치나 모양이 비현실적임 (Organs)",
-            "[해부학] 투과도(Penetration) 물리 법칙 오류 (뼈와 장기의 밝기 부조화)",
+            defect_options = [
+                # 1. Texture
+                "[노이즈/질감] 전반적인 해상도 저하, 픽셀 깨짐 (Noise)",
+                "[노이즈/질감] 텍스트(L/R) 뭉개짐, 배경 아티팩트 (Artifacts)",
+                "[노이즈/질감] 경계면(피부/배경) 분리/섞임 (Boundary)",
 
-            # 3. Lung
-            "[폐] 폐 혈관상(Vascular markings)의 소실 또는 뭉개짐(Blur)",
-            "[폐] 폐 실질 내 해부학적으로 불가능한 혈관 주행/분지 (Vessel Path)",
-            "[폐] 폐의 비정상적인 음영 (Abnormal Patterns)",
+                # 2. Anatomy
+                "[해부학] 늑골(Rib) 개수 오류, 융합, 끊김 (Ribs)",
+                "[해부학] 쇄골/견갑골/척추 비대칭/기형 (Skeletal)",
+                "[해부학] 심장/횡격막 위치/모양 비현실적 (Organs)",
+                "[해부학] 투과도(Penetration) 물리 오류 (Physics)",
+
+                # 3. Lung
+                "[폐] 폐 혈관상(Vascular) 소실/뭉개짐 (Blur)",
+                "[폐] 해부학적으로 불가능한 혈관 주행 (Vessel Path)",
+                "[폐] 비정상적인 음영 패턴 (Abnormal Patterns)",
+                
+                # 4. Others
+                "기타 (아래 상세 판독문에 내용을 적어주세요)"
+            ]
+
+            selected_defects = []
             
-            # 4. Others
-            "기타 (아래 상세 판독문에 내용을 적어주세요)"
-        ]
+            # 체크박스 리스트
+            st.markdown("###### **이상 소견 선택**")
+            for option in defect_options:
+                unique_key = f"{option}_{image_name}"
+                if st.checkbox(option, key=unique_key):
+                    selected_defects.append(option)
 
-        selected_defects = []
-        
-        st.markdown("**이상 소견 선택:**")
-        for option in defect_options:
-            unique_key = f"{option}_{image_name}"
-            if st.checkbox(option, key=unique_key):
-                selected_defects.append(option)
+            st.markdown("---")
 
-        st.markdown("---")
+            st.markdown("###### **상세 판독 (Description)**")
+            detail_note = st.text_area(
+                "상세 내용 작성",
+                height=100,
+                placeholder="예: 우측 늑골 끊김 관찰됨.",
+                key=f"note_{image_name}",
+                label_visibility="collapsed" # 공간 절약을 위해 라벨 숨김
+            )
+            
+            # 버튼을 오른쪽 끝으로 보내고 싶다면 columns 사용 가능
+            # sub_col1, sub_col2 = st.columns([2, 1])
+            # with sub_col2:
+            submit_button = st.form_submit_button(label="저장 후 다음 >", type="primary", use_container_width=True)
 
-        st.markdown("**상세 판독 (Description)**")
-        detail_note = st.text_area(
-            "선택한 항목에 대한 구체적인 설명이나 '기타' 사유를 적어주세요.",
-            height=80,
-            placeholder="예: 우측 늑골 끊김 관찰됨.",
-            key=f"note_{image_name}"
-        )
-        
-        submit_button = st.form_submit_button(label="판독 결과 저장하고 다음으로 >", type="primary")
-
+    # ---------------------------------------------------------
+    # 저장 로직 (폼 바깥에서 처리)
+    # ---------------------------------------------------------
     if submit_button:
         # 1. 아무것도 선택하지 않은 경우
         if not selected_defects:
@@ -188,4 +199,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
