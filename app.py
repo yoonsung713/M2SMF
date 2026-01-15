@@ -10,7 +10,6 @@ st.set_page_config(page_title="합성 CXR 판독 도구", layout="centered")
 # 2. Google Sheets 연결 함수
 def get_google_sheet():
     try:
-        # Streamlit Cloud의 Secrets 기능을 사용
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -40,7 +39,7 @@ def load_image_paths(target_folders):
 
 # 4. 메인 로직
 def main():
-    st.title("🖼️ 합성 CXR 정밀 판독 (Multi-Label)")
+    st.title("🖼️ 합성 CXR 정밀 판독 (Checkbox)")
     
     # 작업할 폴더 리스트
     target_folders = ["roentgen_10_440", "roentgen_75_440"]
@@ -58,7 +57,6 @@ def main():
     if sheet:
         try:
             existing_data = sheet.get_all_values()
-            # 헤더가 있다고 가정, 파일명은 3번째 열(index 2)
             if len(existing_data) > 1:
                 processed_files = set(row[2] for row in existing_data[1:]) 
         except Exception:
@@ -66,7 +64,7 @@ def main():
     else:
         return 
 
-    # 작업 안 한 이미지 인덱스 찾기
+    # 인덱스 찾기
     start_index = 0
     for i, img_path in enumerate(all_images):
         img_name = os.path.basename(img_path)
@@ -81,33 +79,32 @@ def main():
     else:
         st.session_state.current_index = max(st.session_state.current_index, start_index)
 
-    # 모든 작업 완료 시
+    # 완료 처리
     if st.session_state.current_index >= total_images:
         st.success("모든 이미지 판독이 완료되었습니다. 감사합니다!")
         st.balloons()
         return
 
-    # 현재 이미지 정보 로드
+    # 현재 이미지 로드
     current_idx = st.session_state.current_index
     current_image_path = all_images[current_idx]
     image_name = os.path.basename(current_image_path)
     folder_name = os.path.basename(os.path.dirname(current_image_path))
 
-    # UI 상단: 진행률 및 이미지
+    # 진행률 및 이미지 표시
     progress = (current_idx) / total_images
     st.progress(progress)
     st.caption(f"진행 상황: {current_idx + 1} / {total_images} | 폴더: {folder_name}")
-    
     st.image(current_image_path, caption=image_name, use_container_width=True)
 
     # ---------------------------------------------------------
-    # [수정된 부분] 입력 폼: 다중 선택 및 카테고리 적용
+    # [수정됨] 체크박스 형태의 입력 폼
     # ---------------------------------------------------------
     with st.form(key='labeling_form', clear_on_submit=True):
         st.subheader("📝 합성 판단 근거 (Checklist)")
-        st.info("해당 이미지가 '합성'이라고 판단하게 된 요인들을 모두 선택해주세요.")
+        st.info("해당하는 항목을 모두 체크해주세요.")
 
-        # [v_tex], [v_anat], [v_lung] 카테고리별 옵션 정의
+        # 옵션 리스트 정의 (기타 추가됨)
         defect_options = [
             # 1. Texture / Global Artifacts
             "[v_tex] 전반적인 해상도 저하, 픽셀 깨짐, 또는 이질적인 질감 (Noise/Texture)",
@@ -123,21 +120,31 @@ def main():
             # 3. Lung / Fine Patterns
             "[v_lung] 폐 혈관상(Vascular markings)의 소실 또는 뭉개짐(Blur)",
             "[v_lung] 폐 실질 내 해부학적으로 불가능한 혈관 주행/분지 (Vessel Path)",
-            "[v_lung] 폐야 내 설명 불가능한 이상 음영 패턴 (Abnormal Patterns)"
+            "[v_lung] 폐야 내 설명 불가능한 이상 음영 패턴 (Abnormal Patterns)",
+            
+            # 4. Others
+            "기타 (아래 상세 판독문에 내용을 적어주세요)"
         ]
 
-        # 다중 선택 위젯 (Multiselect)
-        selected_defects = st.multiselect(
-            "발견된 이상 소견을 모두 선택하세요:",
-            defect_options
-        )
+        # [변경점] 체크박스 생성 루프
+        # 선택된 항목들을 담을 리스트
+        selected_defects = []
+        
+        st.markdown("**이상 소견 선택:**")
+        for option in defect_options:
+            # 각 옵션마다 체크박스 생성
+            # value=False는 기본적으로 체크 해제 상태
+            if st.checkbox(option, key=option):
+                selected_defects.append(option)
+
+        st.markdown("---")
 
         # 상세 판독문 (Description)
         st.markdown("**상세 판독 (Description)**")
         detail_note = st.text_area(
-            "선택한 항목에 대한 구체적인 설명이나 추가적인 이상 소견을 적어주세요.",
+            "선택한 항목에 대한 구체적인 설명이나 '기타' 사유를 적어주세요.",
             height=80,
-            placeholder="예: 우측 하폐야의 혈관이 중간에 끊겨 보이며, 7번 늑골이 갈라져 있음."
+            placeholder="예: 우측 늑골 끊김 관찰됨. (기타 선택 시 필수 작성)"
         )
         
         # 제출 버튼
@@ -148,11 +155,9 @@ def main():
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # 다중 선택된 리스트를 문자열로 변환 (예: "옵션1, 옵션2")
+            # 체크된 리스트를 문자열로 변환
             defects_str = ", ".join(selected_defects) if selected_defects else "None"
             
-            # [수정됨] 저장 데이터 구조 (Quality 삭제됨)
-            # 순서: [시간, 폴더, 파일, 감지된_결함들, 상세판독문]
             row_data = [
                 timestamp, 
                 folder_name, 
