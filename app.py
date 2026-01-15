@@ -39,7 +39,7 @@ def load_image_paths(target_folders):
 
 # 4. 메인 로직
 def main():
-    st.title("🖼️ 합성 CXR 정밀 판독 (Checkbox)")
+    st.title("🖼️ 합성 CXR 정밀 판독")
     
     # 작업할 폴더 리스트
     target_folders = ["roentgen_10_440", "roentgen_75_440"]
@@ -101,7 +101,7 @@ def main():
     # 입력 폼
     # ---------------------------------------------------------
     with st.form(key=f'labeling_form_{image_name}'):
-        st.subheader("📝 합성 판단 근거 (Checklist)")
+        st.subheader("📝 합성 판단 근거")
         st.info("해당하는 항목을 모두 체크해주세요.")
 
         # 옵션 리스트 정의
@@ -142,7 +142,7 @@ def main():
         detail_note = st.text_area(
             "선택한 항목에 대한 구체적인 설명이나 '기타' 사유를 적어주세요.",
             height=80,
-            placeholder="예: 우측 늑골 끊김 관찰됨. ('기타' 선택 시 필수 작성)",
+            placeholder="예: 우측 늑골 끊김 관찰됨.",
             key=f"note_{image_name}"
         )
         
@@ -188,3 +188,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
