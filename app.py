@@ -5,12 +5,13 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
 # 1. 페이지 설정
-st.set_page_config(page_title="합성 이미지 판독 도구", layout="centered")
+st.set_page_config(page_title="합성 CXR 판독 도구", layout="centered")
 
-# CSS로 라디오 버튼 간격 조절
+# CSS로 라디오 버튼 및 멀티셀렉트 스타일 조절
 st.markdown("""
     <style>
-    .stRadio > label {font-weight: bold; font-size: 1.2rem;}
+    .stRadio > label {font-weight: bold; font-size: 1.1rem;}
+    .stMultiSelect > label {font-weight: bold; font-size: 1.1rem;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -47,7 +48,7 @@ def load_image_paths(target_folders):
 
 # 4. 메인 로직
 def main():
-    st.title("🖼️ 합성 이미지 정밀 판독")
+    st.title("🩻 합성 CXR 정밀 판독 (Clinical Review)")
     
     # 작업할 폴더 리스트
     target_folders = ["roentgen_10_440", "roentgen_75_440"]
@@ -90,7 +91,7 @@ def main():
 
     # 모든 작업 완료 시
     if st.session_state.current_index >= total_images:
-        st.success("모든 이미지 판독이 완료되었습니다. 감사합합니다!")
+        st.success("모든 이미지 판독이 완료되었습니다. 감사합니다!")
         st.balloons()
         return
 
@@ -108,11 +109,11 @@ def main():
     st.image(current_image_path, caption=image_name, use_container_width=True)
 
     # ---------------------------------------------------------
-    # [수정된 부분] 입력 폼: 퀄리티 평가 및 판독문 작성
+    # [수정된 부분] 입력 폼: 임상의 기준 상세 평가
     # ---------------------------------------------------------
     with st.form(key='labeling_form', clear_on_submit=True):
         st.subheader("📝 판독 결과 입력")
-        st.info("이 이미지는 합성된 이미지입니다. 퀄리티와 이상 부위를 판단해주세요.")
+        st.info("영상의학 평가지표를 기준으로 합성 여부를 판단해주세요.")
 
         # 1. 퀄리티 등급 (Quality)
         st.markdown("**1. 합성 퀄리티 등급**")
@@ -122,24 +123,31 @@ def main():
         ]
         quality_choice = st.radio("전반적인 완성도는 어떤가요?", quality_options, index=0)
 
-        # 2. 합성 판단 요인 (Reason)
-        st.markdown("**2. 합성이라고 판단한 주된 요인 (가장 큰 결함)**")
+        st.markdown("---")
+
+        # 2. 합성 판단 요인 (Reason) - 수정된 부분
+        st.markdown("**2. 합성 판단 근거 (Clinical Indicators)**")
+        st.caption("해당하는 결함 요소를 모두 선택해주세요 (복수 선택 가능).")
+        
         defect_options = [
-            "A. 해부학적 구조 오류 (뼈/장기의 위치나 모양이 비현실적)",
-            "B. 질감 및 노이즈 이상 (지나치게 매끄럽거나 거친 패턴)",
-            "C. 음영/대조 부조화 (그림자나 밝기가 주변과 맞지 않음)",
-            "D. 경계선 아티팩트 (배경과 분리되어 보이거나 끊김)",
-            "E. 기괴한 형체/미지의 패턴 (Unknown Artifacts)",
-            "F. 기타 (아래에 상세 기술)"
+            "A. [폐실질] 말초 혈관상(Vascular markings) 소실/뭉개짐 (Ref: 4.6.1)",
+            "B. [폐실질] 해부학적으로 불가능한 혈관 주행/분지 (Ref: 4.6.1)",
+            "C. [뼈] 늑골(Rib)의 개수 오류, 융합, 끊김 (Ref: 4.3.1)",
+            "D. [뼈] 쇄골/견갑골/척추의 비현실적 비대칭/기형 (Ref: 4.4)",
+            "E. [인공물] 텍스트(L/R 마커) 깨짐 또는 정체불명의 부유물 (Ref: 3.3, 4.2)",
+            "F. [물리] 투과도(Penetration) 부조화 (심장 뒤 척추 안 보임 등) (Ref: 4.6.6)",
+            "G. [기타] 기타 사유 (아래 기술)"
         ]
-        defect_choice = st.radio("어느 부분이 가장 어색한가요?", defect_options)
+        
+        # Radio 대신 Multiselect 사용
+        defect_choices = st.multiselect("발견된 이상 소견:", defect_options)
 
         # 3. 상세 판독문 (Pandokmun)
         st.markdown("**3. 상세 판독문 (Description)**")
         detail_note = st.text_area(
             "구체적으로 어떤 부분이 이상한지 서술해주세요.",
             height=100,
-            placeholder="예시: 왼쪽 갈비뼈의 음영이 중간에 끊겨 있고, 폐 하단의 질감이 뭉개져 보임."
+            placeholder="예시: 우측 상엽의 혈관 주행이 갑자기 끊기며, 왼쪽 6번 늑골의 형태가 기형적임."
         )
         
         # 제출 버튼
@@ -150,13 +158,20 @@ def main():
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # [수정됨] 저장 데이터 구조: [시간, 폴더, 파일, 퀄리티, 결함요인, 상세판독문]
+            # [수정됨] 데이터 전처리
+            # 1. Quality: "High" or "Low" 추출
+            quality_val = quality_choice.split(" ")[1] 
+            
+            # 2. Defect: 리스트를 문자열로 변환 (예: "A..., C...")
+            defect_val = ", ".join(defect_choices) if defect_choices else "선택 없음"
+
+            # 저장 데이터 구조: [시간, 폴더, 파일, 퀄리티, 결함요인(전체), 상세판독문]
             row_data = [
                 timestamp, 
                 folder_name, 
                 image_name, 
-                quality_choice.split(" ")[1], # "상" or "하" 만 추출 (괄호 앞부분)
-                defect_choice, 
+                quality_val, 
+                defect_val, 
                 detail_note
             ]
             
@@ -172,4 +187,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
