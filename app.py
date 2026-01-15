@@ -5,13 +5,13 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
 # 1. 페이지 설정
-st.set_page_config(page_title="합성 CXR 판독 도구", layout="centered")
+st.set_page_config(page_title="합성 이미지 임상 판독 도구", layout="centered")
 
-# CSS로 라디오 버튼 및 멀티셀렉트 스타일 조절
+# CSS로 텍스트 가독성 조절
 st.markdown("""
     <style>
-    .stRadio > label {font-weight: bold; font-size: 1.1rem;}
-    .stMultiSelect > label {font-weight: bold; font-size: 1.1rem;}
+    .stMultiSelect > label {font-weight: bold; font-size: 1.2rem;}
+    .stTextArea > label {font-weight: bold; font-size: 1.2rem;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -48,7 +48,7 @@ def load_image_paths(target_folders):
 
 # 4. 메인 로직
 def main():
-    st.title("🩻 합성 CXR 정밀 판독 (Clinical Review)")
+    st.title("👨‍⚕️ CXR 합성 이미지 임상 판독")
     
     # 작업할 폴더 리스트
     target_folders = ["roentgen_10_440", "roentgen_75_440"]
@@ -109,25 +109,14 @@ def main():
     st.image(current_image_path, caption=image_name, use_container_width=True)
 
     # ---------------------------------------------------------
-    # [수정된 부분] 입력 폼: 임상의 기준 상세 평가
+    # [수정됨] 입력 폼: 임상적 근거 다중 선택
     # ---------------------------------------------------------
     with st.form(key='labeling_form', clear_on_submit=True):
         st.subheader("📝 판독 결과 입력")
-        st.info("영상의학 평가지표를 기준으로 합성 여부를 판단해주세요.")
+        st.info("영상의학 평가지표를 기준으로 합성이라고 판단되는 근거를 선택해주세요.")
 
-        # 1. 퀄리티 등급 (Quality)
-        st.markdown("**1. 합성 퀄리티 등급**")
-        quality_options = [
-            "1. High Quality - 언뜻 보면 실제와 구분이 어려움",
-            "2. Low Quality - 합성인 것이 명확히 드러남"
-        ]
-        quality_choice = st.radio("전반적인 완성도는 어떤가요?", quality_options, index=0)
-
-        st.markdown("---")
-
-        # 2. 합성 판단 요인 (Reason) - 수정된 부분
-        st.markdown("**2. 합성 판단 근거 (Clinical Indicators)**")
-        st.caption("해당하는 결함 요소를 모두 선택해주세요 (복수 선택 가능).")
+        # 1. 합성 판단 요인 (다중 선택 가능)
+        st.markdown("**1. 합성 판단 주된 근거 (Clinical Evidence)**")
         
         defect_options = [
             "A. [폐실질] 말초 혈관상(Vascular markings) 소실/뭉개짐 (Ref: 4.6.1)",
@@ -139,15 +128,18 @@ def main():
             "G. [기타] 기타 사유 (아래 기술)"
         ]
         
-        # Radio 대신 Multiselect 사용
-        defect_choices = st.multiselect("발견된 이상 소견:", defect_options)
+        # multiselect로 변경하여 다중 선택 가능
+        selected_defects = st.multiselect(
+            "해당하는 항목을 모두 선택하세요:",
+            defect_options
+        )
 
-        # 3. 상세 판독문 (Pandokmun)
-        st.markdown("**3. 상세 판독문 (Description)**")
+        # 2. 상세 판독문 (Pandokmun)
+        st.markdown("**2. 상세 판독문 (Description)**")
         detail_note = st.text_area(
-            "구체적으로 어떤 부분이 이상한지 서술해주세요.",
+            "구체적인 이상 소견이나 기타 사유를 서술해주세요.",
             height=100,
-            placeholder="예시: 우측 상엽의 혈관 주행이 갑자기 끊기며, 왼쪽 6번 늑골의 형태가 기형적임."
+            placeholder="예: 우측 폐첨부 혈관이 끊겨 보이며, 6번 늑골의 주행이 비정상적임."
         )
         
         # 제출 버튼
@@ -158,20 +150,16 @@ def main():
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # [수정됨] 데이터 전처리
-            # 1. Quality: "High" or "Low" 추출
-            quality_val = quality_choice.split(" ")[1] 
+            # 다중 선택된 리스트를 문자열로 변환 (예: "A..., C...")
+            defects_str = ", ".join(selected_defects)
             
-            # 2. Defect: 리스트를 문자열로 변환 (예: "A..., C...")
-            defect_val = ", ".join(defect_choices) if defect_choices else "선택 없음"
-
-            # 저장 데이터 구조: [시간, 폴더, 파일, 퀄리티, 결함요인(전체), 상세판독문]
+            # [수정됨] 저장 데이터 구조: [시간, 폴더, 파일, 결함요인들, 상세판독문]
+            # 퀄리티(Quality) 컬럼은 제거되었습니다.
             row_data = [
                 timestamp, 
                 folder_name, 
                 image_name, 
-                quality_val, 
-                defect_val, 
+                defects_str, 
                 detail_note
             ]
             
