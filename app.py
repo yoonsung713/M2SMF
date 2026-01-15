@@ -50,7 +50,7 @@ def main():
         st.error("지정된 폴더들에 이미지가 없습니다.")
         return
 
-    # 구글 시트 연결 및 중복 확인
+    # 구글 시트 연결
     sheet = get_google_sheet()
     processed_files = set()
     
@@ -91,33 +91,42 @@ def main():
     image_name = os.path.basename(current_image_path)
     folder_name = os.path.basename(os.path.dirname(current_image_path))
 
-    # 진행률 및 이미지 표시
+    # 진행률 표시
     progress = (current_idx) / total_images
     st.progress(progress)
     st.caption(f"진행 상황: {current_idx + 1} / {total_images} | 폴더: {folder_name}")
+
+    # ---------------------------------------------------------
+    # [추가됨] 폴더명에 따른 안내 메시지 표시
+    # ---------------------------------------------------------
+    if folder_name == "roentgen_10_440":
+        st.warning("📉 **참고:** 이 이미지는 **Low Quality Data**입니다.", icon="⚠️")
+    elif folder_name == "roentgen_75_440":
+        st.success("📈 **참고:** 이 이미지는 **High Quality Data**입니다.", icon="✅")
+    
+    # 이미지 표시
     st.image(current_image_path, caption=image_name, use_container_width=True)
 
     # ---------------------------------------------------------
     # 입력 폼
     # ---------------------------------------------------------
     with st.form(key=f'labeling_form_{image_name}'):
-        st.subheader("📝 합성 판단 근거")
+        st.subheader("📝 합성 판단 근거 (Checklist)")
         st.info("해당하는 항목을 모두 체크해주세요.")
 
-        # 옵션 리스트 정의
         defect_options = [
-            # 1. Texture / Global Artifacts
+            # 1. Texture
             "[노이즈/질감] 전반적인 해상도 저하, 픽셀 깨짐, 또는 이질적인 질감 (Noise/Texture)",
             "[노이즈/질감] 텍스트(L/R 마커) 뭉개짐, 또는 배경의 정체불명 아티팩트 (Artifacts)",
             "[노이즈/질감] 경계면(피부/배경)이 부자연스럽게 분리되거나 섞임 (Boundary)",
 
-            # 2. Anatomy / Structure
+            # 2. Anatomy
             "[해부학] 늑골(Rib)의 개수 오류, 융합, 끊김 현상 (Skeletal-Ribs)",
             "[해부학] 쇄골/견갑골/척추의 좌우 비대칭 또는 기형 (Skeletal-General)",
             "[해부학] 심장/횡격막의 위치나 모양이 비현실적임 (Organs)",
             "[해부학] 투과도(Penetration) 물리 법칙 오류 (뼈와 장기의 밝기 부조화)",
 
-            # 3. Lung / Fine Patterns
+            # 3. Lung
             "[폐] 폐 혈관상(Vascular markings)의 소실 또는 뭉개짐(Blur)",
             "[폐] 폐 실질 내 해부학적으로 불가능한 혈관 주행/분지 (Vessel Path)",
             "[폐] 폐의 비정상적인 음영 (Abnormal Patterns)",
@@ -126,7 +135,6 @@ def main():
             "기타 (아래 상세 판독문에 내용을 적어주세요)"
         ]
 
-        # 체크박스 생성 루프
         selected_defects = []
         
         st.markdown("**이상 소견 선택:**")
@@ -137,7 +145,6 @@ def main():
 
         st.markdown("---")
 
-        # 상세 판독문
         st.markdown("**상세 판독 (Description)**")
         detail_note = st.text_area(
             "선택한 항목에 대한 구체적인 설명이나 '기타' 사유를 적어주세요.",
@@ -146,26 +153,20 @@ def main():
             key=f"note_{image_name}"
         )
         
-        # 제출 버튼
         submit_button = st.form_submit_button(label="판독 결과 저장하고 다음으로 >", type="primary")
 
-    # ---------------------------------------------------------
-    # [수정됨] 저장 로직 및 유효성 검사 (순서 중요)
-    # ---------------------------------------------------------
     if submit_button:
-        # 1. 아무것도 선택하지 않은 경우 체크 (이 부분이 추가되었습니다!)
+        # 1. 아무것도 선택하지 않은 경우
         if not selected_defects:
             st.error("⚠️ 최소한 하나 이상의 항목을 선택해야 합니다.")
 
-        # 2. '기타'를 선택했는데 내용이 없는 경우 체크
+        # 2. '기타' 선택 후 내용 없는 경우
         elif any("기타" in opt for opt in selected_defects) and not detail_note.strip():
             st.error("⚠️ '기타' 항목을 선택하셨습니다. 상세 판독문에 사유를 작성해주세요.")
 
-        # 3. 모든 조건을 통과했을 때만 저장
         else:
             try:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                
                 defects_str = ", ".join(selected_defects)
                 
                 row_data = [
@@ -177,7 +178,6 @@ def main():
                 ]
                 
                 sheet.append_row(row_data)
-                
                 st.toast(f"저장 완료! ({image_name})")
                 
                 st.session_state.current_index += 1
@@ -188,4 +188,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
