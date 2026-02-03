@@ -5,6 +5,9 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 from PIL import Image # 이미지 크기 조절을 위해 PIL 라이브러리 추가
 
+# ⚠️ 필수 요구사항: streamlit >= 1.31.0 버전이 필요합니다. (vertical_alignment 파라미터 사용)
+# pip install streamlit --upgrade
+
 # 1. 페이지 설정 (반드시 최상단에 위치)
 st.set_page_config(page_title="합성 CXR 판독 도구", layout="wide")
 
@@ -14,6 +17,11 @@ def get_google_sheet():
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         # st.secrets에 저장된 서비스 계정 키 사용
         # (실제 배포 시 st.secrets 설정이 필요합니다. 로컬 테스트 시 json 파일 경로로 대체 가능)
+        # secrets.toml 파일이 없거나 설정이 안되어 있으면 이 부분에서 에러가 날 수 있습니다.
+        if "gcp_service_account" not in st.secrets:
+             # st.warning("Secrets에 gcp_service_account 설정이 없습니다. 로컬 모드로 동작합니다.")
+             return None
+             
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
@@ -208,8 +216,12 @@ def main():
             # ==============================================================================
             def add_question_with_example(label_text, internal_key, example_key=None):
                 # 폼 내부에서 다시 좌우 컬럼 분할 (비율 조정 가능, 예: [7, 3])
-                # vertical_alignment="center"는 스트림릿 최신 버전에서 지원하여 수직 중앙 정렬을 돕습니다.
-                q_col, img_col = st.columns([7, 3], vertical_alignment="center")
+                # ⚠️ 주의: vertical_alignment="center"는 Streamlit 1.31.0 이상에서 지원됩니다.
+                try:
+                    q_col, img_col = st.columns([7, 3], vertical_alignment="center")
+                except TypeError:
+                     # 구버전 호환성 유지 (vertical_alignment 파라미터 제거)
+                     q_col, img_col = st.columns([7, 3])
 
                 with q_col:
                     # [왼쪽] 질문 체크박스
@@ -236,21 +248,19 @@ def main():
 
             # --- 1. Texture 섹션 ---
             st.markdown("##### **[Texture]**")
+            # ✅ 수정됨: 여러 줄 문자열은 따옴표 세 개(""")를 사용해야 합니다.
             add_question_with_example(
-                "1. 위치 마커(L/R) 오류\n(Marker Artifacts) \n: 기존 '텍스트 뭉개짐'을 '위치 마커 오류'로 명확히 하고, 반전/위치 이상을 포함해 포괄적으로 정의 
-", # 줄바꿈을 넣어 텍스트 영역을 확보
+                """1. 위치 마커(L/R) 오류\n(Marker Artifacts) \n: 기존 '텍스트 뭉개짐'을 '위치 마커 오류'로 명확히 하고, 반전/위치 이상을 포함해 포괄적으로 정의""",
                 "q_marker",
                 "marker_error"
             )
             add_question_with_example(
-                "2. 비현실적 투과도 및 밀도\n(Density & Penetration) \n: '얼룩덜룩함', '뼈가 가장 하얗지 않음'이라는 물리적 오류를 하나의 항목으로 통합
-",
+                """2. 비현실적 투과도 및 밀도\n(Density & Penetration) \n: '얼룩덜룩함', '뼈가 가장 하얗지 않음'이라는 물리적 오류를 하나의 항목으로 통합""",
                 "q_density",
                 "density_penetration"
             )
             add_question_with_example(
-                "3. 위장관/복부 가스 음영 오류\n(Abnormal Gas Pattern) \n: 교수님께서 예시로 들어주신 '하얘야 하는데 시꺼멓게 있는 경우'를 '위장관 가스/음영 오류'로 구체화하여 추가
- ",
+                """3. 위장관/복부 가스 음영 오류\n(Abnormal Gas Pattern) \n: 교수님께서 예시로 들어주신 '하얘야 하는데 시꺼멓게 있는 경우'를 '위장관 가스/음영 오류'로 구체화하여 추가""",
                 "q_gas",
                 "abnormal_gas"
             )
@@ -259,27 +269,24 @@ def main():
 
             # --- 2. Anatomy 섹션 ---
             st.markdown("##### **[Anatomy]**")
+            # ✅ 수정됨: 여러 줄 문자열은 따옴표 세 개(""")를 사용해야 합니다.
             add_question_with_example(
-                "4. 구조물 경계 모호\n(Vague Boundaries) \n: 피부, 장기, 뼈 등을 통합하여 전반적인 '경계선(Contour)' 문제를 지적
-",
+                """4. 구조물 경계 모호\n(Vague Boundaries) \n: 피부, 장기, 뼈 등을 통합하여 전반적인 '경계선(Contour)' 문제를 지적""",
                 "q_boundary",
                 "vague_boundaries"
             )
             add_question_with_example(
-                "5. 전방 늑골(Anterior Ribs) 소실/끊김 \n: 뒤쪽은 잘 보이는데 앞쪽이 안 보이는 것이 합성의 전형적인 특징 -> '전방 늑골'로 특정
-",
+                """5. 전방 늑골(Anterior Ribs) 소실/끊김 \n: 뒤쪽은 잘 보이는데 앞쪽이 안 보이는 것이 합성의 전형적인 특징 -> '전방 늑골'로 특정""",
                 "q_ribs",
                 "anterior_ribs"
             )
             add_question_with_example(
-                "6. 쇄골 형태 이상 (Wavy) \n: 쇄골의 형태가 울퉁불퉁한 것도 합성의 전형적인 특징
-",
+                """6. 쇄골 형태 이상 (Wavy) \n: 쇄골의 형태가 울퉁불퉁한 것도 합성의 전형적인 특징""",
                 "q_clavicle",
                 "wavy_clavicle"
             )
             add_question_with_example(
-                "7. 장기 모양 기형\n(Abnormal Organ Shape) \n: 장기의 '위치'보다는 '모양/윤곽'이 문제라는 피드백을 반영하여 항목을 분리
-",
+                """7. 장기 모양 기형\n(Abnormal Organ Shape) \n: 장기의 '위치'보다는 '모양/윤곽'이 문제라는 피드백을 반영하여 항목을 분리""",
                 "q_organ_shape",
                 "abnormal_organ_shape"
             )
@@ -352,4 +359,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
