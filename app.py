@@ -13,6 +13,7 @@ st.set_page_config(page_title="합성 CXR 판독 도구", layout="wide")
 
 # 2. Google Sheets 연결 함수
 def get_google_sheet():
+    # ... (이전과 동일) ...
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         # st.secrets에 저장된 서비스 계정 키 사용
@@ -35,6 +36,7 @@ def get_google_sheet():
 # 3. 이미지 파일 리스트 불러오기
 @st.cache_data
 def load_image_paths(target_folders):
+    # ... (이전과 동일) ...
     image_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'}
     image_paths = []
 
@@ -53,6 +55,7 @@ def load_image_paths(target_folders):
 # 각 질문 항목에 매칭될 예시 이미지의 경로를 반환하는 함수입니다.
 # 실제 이미지 파일이 존재하는 경로로 수정해야 합니다.
 def get_example_image_path(question_key):
+    # ... (이전과 동일) ...
     # 예시 이미지가 저장된 기본 폴더명 (실제 환경에 맞게 수정 필요)
     # 예: "assets/examples" 또는 "images" 등
     example_images_dir = "images"
@@ -81,6 +84,7 @@ def get_example_image_path(question_key):
 # 이미지 경로와 목표 높이를 입력받아 비율을 유지하며 리사이즈된 PIL 이미지 객체를 반환합니다.
 @st.cache_data(ttl=3600) # 성능을 위해 캐싱 적용 (1시간)
 def resize_image_pil(image_path, target_height):
+    # ... (이전과 동일) ...
     try:
         img = Image.open(image_path)
         # 원본 비율 계산
@@ -96,6 +100,7 @@ def resize_image_pil(image_path, target_height):
 
 # 4. 메인 로직
 def main():
+    # ... (이전과 동일) ...
     st.title("🖼️ 합성 CXR 정밀 판독")
 
     # ---------------------------------------------------------
@@ -215,21 +220,40 @@ def main():
             # [핵심 수정 부분] 질문 및 예시 이미지 옆으로 나란히 표시하는 함수
             # ==============================================================================
             def add_question_with_example(label_text, internal_key, example_key=None):
-                # 폼 내부에서 다시 좌우 컬럼 분할 (비율 조정 가능, 예: [7, 3])
+                # 폼 내부에서 다시 좌우 컬럼 분할
                 # ⚠️ 주의: vertical_alignment="center"는 Streamlit 1.31.0 이상에서 지원됩니다.
                 try:
-                    q_col, img_col = st.columns([7, 3], vertical_alignment="center")
+                    # 텍스트가 길어질 수 있으므로 상단 정렬("top")이 더 자연스러울 수 있습니다.
+                    q_col, img_col = st.columns([7, 3], vertical_alignment="top")
                 except TypeError:
-                     # 구버전 호환성 유지 (vertical_alignment 파라미터 제거)
+                     # 구버전 호환성 유지
                      q_col, img_col = st.columns([7, 3])
 
                 with q_col:
-                    # [왼쪽] 질문 체크박스
-                    # ✅ st.checkbox는 마크다운 및 줄바꿈(\n)을 지원합니다.
-                    if st.checkbox(label_text, key=f"{internal_key}_{image_name}"):
-                        # 저장될 때는 줄바꿈을 공백으로 변경하여 한 줄로 저장 (선택 사항)
-                        clean_label = label_text.replace('\n', ' ').replace(':', '').strip()
-                        selected_defects.append(clean_label)
+                    # --- [수정됨] 텍스트 분리 로직 ---
+                    # 콜론(:)을 기준으로 제목과 설명을 분리합니다.
+                    if ":" in label_text:
+                        parts = label_text.split(":", 1)
+                        main_label = parts[0].strip()
+                        description = parts[1].strip()
+                        # 줄바꿈 문자(\n)가 포함되어 있다면 제거하거나 공백으로 대체
+                        main_label = main_label.replace("\n", " ")
+                    else:
+                        # 콜론이 없는 경우 전체를 제목으로 사용
+                        main_label = label_text
+                        description = None
+
+                    # [왼쪽] 질문 체크박스 (제목만 표시)
+                    # 체크박스 라벨에는 마크다운이 지원되지 않으므로 텍스트만 사용
+                    if st.checkbox(main_label, key=f"{internal_key}_{image_name}"):
+                        # 저장 시에는 전체 텍스트(제목+설명)를 사용 (선택 사항)
+                        # 원하신다면 main_label만 저장하도록 수정 가능합니다.
+                        selected_defects.append(label_text)
+
+                    # [왼쪽] 설명 텍스트 (체크박스 아래에 표시)
+                    if description:
+                        # caption을 사용하여 보조 텍스트처럼 표시 (자동으로 다음 줄로 내려감)
+                        st.caption(f": {description}")
 
                 with img_col:
                     # [오른쪽] 예시 이미지가 있으면 표시
@@ -238,32 +262,35 @@ def main():
                         # 파일 존재 여부 확인
                         if example_path and os.path.exists(example_path):
                             # --- [NEW] 이미지 리사이즈 (높이 68 고정) ---
-                            resized_img = resize_image_pil(example_path, target_height=68)
+                            # 텍스트가 두 줄이 되면서 높이가 늘어날 수 있으므로, 이미지 높이를 약간 키워 균형을 맞출 수 있습니다.
+                            # 필요에 따라 target_height를 조절하세요 (예: 80, 90 등).
+                            resized_img = resize_image_pil(example_path, target_height=80)
                             if resized_img:
                                 # 리사이즈된 PIL 이미지 객체를 바로 st.image에 전달
                                 # use_container_width=False로 설정하여 리사이즈된 크기 그대로 표시
                                 st.image(resized_img, use_container_width=False)
                         # else:
                         #     # 이미지가 없을 때 대체 텍스트 표시 (선택 사항)
-                        #     st.caption("(이미지 없음)")
+                        #     # st.caption("(이미지 없음)")
+                        #     pass
             # ==============================================================================
 
 
             # --- 1. Texture 섹션 ---
             st.markdown("##### **[Texture]**")
-            # ✅ 수정됨: 여러 줄 문자열(""") 내에서 줄바꿈(\n)을 사용하여 설명을 아래로 내림
+            # ✅ 수정됨: 여러 줄 문자열은 따옴표 세 개(""")를 사용해야 합니다.
             add_question_with_example(
-                """1. 위치 마커(L/R) 오류 (Marker Artifacts)\n: 기존 '텍스트 뭉개짐'을 '위치 마커 오류'로 명확히 하고, 반전/위치 이상을 포함해 포괄적으로 정의""",
+                """1. 위치 마커(L/R) 오류(Marker Artifacts) : 기존 '텍스트 뭉개짐'을 '위치 마커 오류'로 명확히 하고, 반전/위치 이상을 포함해 포괄적으로 정의""",
                 "q_marker",
                 "marker_error"
             )
             add_question_with_example(
-                """2. 비현실적 투과도 및 밀도 (Density & Penetration)\n: '얼룩덜룩함', '뼈가 가장 하얗지 않음'이라는 물리적 오류를 하나의 항목으로 통합""",
+                """2. 비현실적 투과도 및 밀도(Density & Penetration) : '얼룩덜룩함', '뼈가 가장 하얗지 않음'이라는 물리적 오류를 하나의 항목으로 통합""",
                 "q_density",
                 "density_penetration"
             )
             add_question_with_example(
-                """3. 위장관/복부 가스 음영 오류 (Abnormal Gas Pattern)\n: 교수님께서 예시로 들어주신 '하얘야 하는데 시꺼멓게 있는 경우'를 '위장관 가스/음영 오류'로 구체화하여 추가""",
+                """3. 위장관/복부 가스 음영 오류(Abnormal Gas Pattern) : 교수님께서 예시로 들어주신 '하얘야 하는데 시꺼멓게 있는 경우'를 '위장관 가스/음영 오류'로 구체화하여 추가""",
                 "q_gas",
                 "abnormal_gas"
             )
@@ -272,24 +299,24 @@ def main():
 
             # --- 2. Anatomy 섹션 ---
             st.markdown("##### **[Anatomy]**")
-            # ✅ 수정됨: 여러 줄 문자열(""") 내에서 줄바꿈(\n)을 사용하여 설명을 아래로 내림
+            # ✅ 수정됨: 여러 줄 문자열은 따옴표 세 개(""")를 사용해야 합니다.
             add_question_with_example(
-                """4. 구조물 경계 모호 (Vague Boundaries)\n: 피부, 장기, 뼈 등을 통합하여 전반적인 '경계선(Contour)' 문제를 지적""",
+                """4. 구조물 경계 모호(Vague Boundaries) : 피부, 장기, 뼈 등을 통합하여 전반적인 '경계선(Contour)' 문제를 지적""",
                 "q_boundary",
                 "vague_boundaries"
             )
             add_question_with_example(
-                """5. 전방 늑골(Anterior Ribs) 소실/끊김\n: 뒤쪽은 잘 보이는데 앞쪽이 안 보이는 것이 합성의 전형적인 특징 -> '전방 늑골'로 특정""",
+                """5. 전방 늑골(Anterior Ribs) 소실/끊김 : 뒤쪽은 잘 보이는데 앞쪽이 안 보이는 것이 합성의 전형적인 특징 -> '전방 늑골'로 특정""",
                 "q_ribs",
                 "anterior_ribs"
             )
             add_question_with_example(
-                """6. 쇄골 형태 이상 (Wavy)\n: 쇄골의 형태가 울퉁불퉁한 것도 합성의 전형적인 특징""",
+                """6. 쇄골 형태 이상 (Wavy) : 쇄골의 형태가 울퉁불퉁한 것도 합성의 전형적인 특징""",
                 "q_clavicle",
                 "wavy_clavicle"
             )
             add_question_with_example(
-                """7. 장기 모양 기형 (Abnormal Organ Shape)\n: 장기의 '위치'보다는 '모양/윤곽'이 문제라는 피드백을 반영하여 항목을 분리""",
+                """7. 장기 모양 기형(Abnormal Organ Shape) : 장기의 '위치'보다는 '모양/윤곽'이 문제라는 피드백을 반영하여 항목을 분리""",
                 "q_organ_shape",
                 "abnormal_organ_shape"
             )
@@ -299,8 +326,7 @@ def main():
             # --- 3. 기타 및 상세 내역 ---
             st.markdown("##### **[기타 및 상세]**")
             # 기타 항목은 예시 이미지가 없으므로 None 전달
-            # ✅ 수정됨: 줄바꿈 적용
-            add_question_with_example("기타\n: (아래 상세 내용 작성 필요)", "q_other", None)
+            add_question_with_example("기타 (아래 상세 내용 작성 필요)", "q_other", None)
 
             st.write("") # 약간의 여백
             detail_note = st.text_area(
@@ -319,12 +345,12 @@ def main():
         # 저장 로직 (폼 바깥에서 처리)
         # ---------------------------------------------------------
         if submit_button:
+            # ... (이전과 동일) ...
             # 검증 1: 아무것도 선택하지 않은 경우
             if not selected_defects:
                 st.error("⚠️ 최소한 하나 이상의 판단 근거를 선택해야 합니다.")
 
             # 검증 2: '기타' 선택 후 내용 없는 경우 (체크박스 텍스트에 '기타'가 포함되었는지 확인)
-            # 저장된 라벨 텍스트에서 '기타'가 포함되어 있는지 확인합니다.
             elif any("기타" in opt for opt in selected_defects) and not detail_note.strip():
                 st.error("⚠️ '기타' 항목을 선택하셨습니다. 상세 판독 내용에 사유를 작성해주세요.")
 
