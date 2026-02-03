@@ -237,17 +237,20 @@ def main():
             # --- 1. Texture 섹션 ---
             st.markdown("##### **[Texture]**")
             add_question_with_example(
-                "1. 위치 마커(L/R) 오류\n(Marker Artifacts)", # 줄바꿈을 넣어 텍스트 영역을 확보
+                "1. 위치 마커(L/R) 오류\n(Marker Artifacts) \n: 기존 '텍스트 뭉개짐'을 '위치 마커 오류'로 명확히 하고, 반전/위치 이상을 포함해 포괄적으로 정의 
+", # 줄바꿈을 넣어 텍스트 영역을 확보
                 "q_marker",
                 "marker_error"
             )
             add_question_with_example(
-                "2. 비현실적 투과도 및 밀도\n(Density & Penetration)",
+                "2. 비현실적 투과도 및 밀도\n(Density & Penetration) \n: '얼룩덜룩함', '뼈가 가장 하얗지 않음'이라는 물리적 오류를 하나의 항목으로 통합
+",
                 "q_density",
                 "density_penetration"
             )
             add_question_with_example(
-                "3. 위장관/복부 가스 음영 오류\n(Abnormal Gas Pattern)",
+                "3. 위장관/복부 가스 음영 오류\n(Abnormal Gas Pattern) \n: 교수님께서 예시로 들어주신 '하얘야 하는데 시꺼멓게 있는 경우'를 '위장관 가스/음영 오류'로 구체화하여 추가
+ ",
                 "q_gas",
                 "abnormal_gas"
             )
@@ -257,22 +260,26 @@ def main():
             # --- 2. Anatomy 섹션 ---
             st.markdown("##### **[Anatomy]**")
             add_question_with_example(
-                "1. 구조물 경계 모호\n(Vague Boundaries)",
+                "4. 구조물 경계 모호\n(Vague Boundaries) \n: 피부, 장기, 뼈 등을 통합하여 전반적인 '경계선(Contour)' 문제를 지적
+",
                 "q_boundary",
                 "vague_boundaries"
             )
             add_question_with_example(
-                "2. 전방 늑골(Anterior Ribs) 소실/끊김",
+                "5. 전방 늑골(Anterior Ribs) 소실/끊김 \n: 뒤쪽은 잘 보이는데 앞쪽이 안 보이는 것이 합성의 전형적인 특징 -> '전방 늑골'로 특정
+",
                 "q_ribs",
                 "anterior_ribs"
             )
             add_question_with_example(
-                "3. 쇄골 형태 이상 (Wavy)",
+                "6. 쇄골 형태 이상 (Wavy) \n: 쇄골의 형태가 울퉁불퉁한 것도 합성의 전형적인 특징
+",
                 "q_clavicle",
                 "wavy_clavicle"
             )
             add_question_with_example(
-                "4. 장기 모양 기형\n(Abnormal Organ Shape)",
+                "7. 장기 모양 기형\n(Abnormal Organ Shape) \n: 장기의 '위치'보다는 '모양/윤곽'이 문제라는 피드백을 반영하여 항목을 분리
+",
                 "q_organ_shape",
                 "abnormal_organ_shape"
             )
@@ -345,3 +352,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
