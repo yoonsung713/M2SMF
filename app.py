@@ -225,8 +225,11 @@ def main():
 
                 with q_col:
                     # [왼쪽] 질문 체크박스
+                    # ✅ st.checkbox는 마크다운 및 줄바꿈(\n)을 지원합니다.
                     if st.checkbox(label_text, key=f"{internal_key}_{image_name}"):
-                        selected_defects.append(label_text)
+                        # 저장될 때는 줄바꿈을 공백으로 변경하여 한 줄로 저장 (선택 사항)
+                        clean_label = label_text.replace('\n', ' ').replace(':', '').strip()
+                        selected_defects.append(clean_label)
 
                 with img_col:
                     # [오른쪽] 예시 이미지가 있으면 표시
@@ -248,19 +251,19 @@ def main():
 
             # --- 1. Texture 섹션 ---
             st.markdown("##### **[Texture]**")
-            # ✅ 수정됨: 여러 줄 문자열은 따옴표 세 개(""")를 사용해야 합니다.
+            # ✅ 수정됨: 여러 줄 문자열(""") 내에서 줄바꿈(\n)을 사용하여 설명을 아래로 내림
             add_question_with_example(
-                """1. 위치 마커(L/R) 오류\n(Marker Artifacts) \n: 기존 '텍스트 뭉개짐'을 '위치 마커 오류'로 명확히 하고, 반전/위치 이상을 포함해 포괄적으로 정의""",
+                """1. 위치 마커(L/R) 오류 (Marker Artifacts)\n: 기존 '텍스트 뭉개짐'을 '위치 마커 오류'로 명확히 하고, 반전/위치 이상을 포함해 포괄적으로 정의""",
                 "q_marker",
                 "marker_error"
             )
             add_question_with_example(
-                """2. 비현실적 투과도 및 밀도\n(Density & Penetration) \n: '얼룩덜룩함', '뼈가 가장 하얗지 않음'이라는 물리적 오류를 하나의 항목으로 통합""",
+                """2. 비현실적 투과도 및 밀도 (Density & Penetration)\n: '얼룩덜룩함', '뼈가 가장 하얗지 않음'이라는 물리적 오류를 하나의 항목으로 통합""",
                 "q_density",
                 "density_penetration"
             )
             add_question_with_example(
-                """3. 위장관/복부 가스 음영 오류\n(Abnormal Gas Pattern) \n: 교수님께서 예시로 들어주신 '하얘야 하는데 시꺼멓게 있는 경우'를 '위장관 가스/음영 오류'로 구체화하여 추가""",
+                """3. 위장관/복부 가스 음영 오류 (Abnormal Gas Pattern)\n: 교수님께서 예시로 들어주신 '하얘야 하는데 시꺼멓게 있는 경우'를 '위장관 가스/음영 오류'로 구체화하여 추가""",
                 "q_gas",
                 "abnormal_gas"
             )
@@ -269,24 +272,24 @@ def main():
 
             # --- 2. Anatomy 섹션 ---
             st.markdown("##### **[Anatomy]**")
-            # ✅ 수정됨: 여러 줄 문자열은 따옴표 세 개(""")를 사용해야 합니다.
+            # ✅ 수정됨: 여러 줄 문자열(""") 내에서 줄바꿈(\n)을 사용하여 설명을 아래로 내림
             add_question_with_example(
-                """4. 구조물 경계 모호\n(Vague Boundaries) \n: 피부, 장기, 뼈 등을 통합하여 전반적인 '경계선(Contour)' 문제를 지적""",
+                """4. 구조물 경계 모호 (Vague Boundaries)\n: 피부, 장기, 뼈 등을 통합하여 전반적인 '경계선(Contour)' 문제를 지적""",
                 "q_boundary",
                 "vague_boundaries"
             )
             add_question_with_example(
-                """5. 전방 늑골(Anterior Ribs) 소실/끊김 \n: 뒤쪽은 잘 보이는데 앞쪽이 안 보이는 것이 합성의 전형적인 특징 -> '전방 늑골'로 특정""",
+                """5. 전방 늑골(Anterior Ribs) 소실/끊김\n: 뒤쪽은 잘 보이는데 앞쪽이 안 보이는 것이 합성의 전형적인 특징 -> '전방 늑골'로 특정""",
                 "q_ribs",
                 "anterior_ribs"
             )
             add_question_with_example(
-                """6. 쇄골 형태 이상 (Wavy) \n: 쇄골의 형태가 울퉁불퉁한 것도 합성의 전형적인 특징""",
+                """6. 쇄골 형태 이상 (Wavy)\n: 쇄골의 형태가 울퉁불퉁한 것도 합성의 전형적인 특징""",
                 "q_clavicle",
                 "wavy_clavicle"
             )
             add_question_with_example(
-                """7. 장기 모양 기형\n(Abnormal Organ Shape) \n: 장기의 '위치'보다는 '모양/윤곽'이 문제라는 피드백을 반영하여 항목을 분리""",
+                """7. 장기 모양 기형 (Abnormal Organ Shape)\n: 장기의 '위치'보다는 '모양/윤곽'이 문제라는 피드백을 반영하여 항목을 분리""",
                 "q_organ_shape",
                 "abnormal_organ_shape"
             )
@@ -296,7 +299,8 @@ def main():
             # --- 3. 기타 및 상세 내역 ---
             st.markdown("##### **[기타 및 상세]**")
             # 기타 항목은 예시 이미지가 없으므로 None 전달
-            add_question_with_example("기타 (아래 상세 내용 작성 필요)", "q_other", None)
+            # ✅ 수정됨: 줄바꿈 적용
+            add_question_with_example("기타\n: (아래 상세 내용 작성 필요)", "q_other", None)
 
             st.write("") # 약간의 여백
             detail_note = st.text_area(
@@ -320,6 +324,7 @@ def main():
                 st.error("⚠️ 최소한 하나 이상의 판단 근거를 선택해야 합니다.")
 
             # 검증 2: '기타' 선택 후 내용 없는 경우 (체크박스 텍스트에 '기타'가 포함되었는지 확인)
+            # 저장된 라벨 텍스트에서 '기타'가 포함되어 있는지 확인합니다.
             elif any("기타" in opt for opt in selected_defects) and not detail_note.strip():
                 st.error("⚠️ '기타' 항목을 선택하셨습니다. 상세 판독 내용에 사유를 작성해주세요.")
 
