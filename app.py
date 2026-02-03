@@ -4,16 +4,18 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
-# 1. 페이지 설정 (레이아웃을 'wide'로 변경하여 가로 공간 확보)
-st.set_page_config(page_title="합성 CXR 판독 도구", layout="wide") 
+# 1. 페이지 설정
+st.set_page_config(page_title="합성 CXR 판독 도구", layout="wide")
 
 # 2. Google Sheets 연결 함수
 def get_google_sheet():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        # st.secrets에 저장된 서비스 계정 키 사용
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
+        # 실제 사용할 스프레드시트 이름과 시트 이름으로 변경하세요
         sheet = client.open("labeling_results").sheet1 
         return sheet
     except Exception as e:
@@ -37,6 +39,31 @@ def load_image_paths(target_folders):
             
     return sorted(image_paths)
 
+# --- [NEW] 예시 이미지 경로 함수 ---
+# 각 질문 항목에 매칭될 예시 이미지의 경로를 반환하는 함수입니다.
+# 실제 이미지 파일이 존재하는 경로로 수정해야 합니다.
+def get_example_image_path(question_key):
+    example_images_dir = "example_images" # 예시 이미지가 저장된 폴더명
+    
+    # 질문 키와 이미지 파일명 매핑
+    mapping = {
+        # Texture
+        "marker_error": "example_marker_error.png",
+        "density_penetration": "example_density_penetration.png",
+        "abnormal_gas": "example_abnormal_gas.png",
+        
+        # Anatomy
+        "vague_boundaries": "example_vague_boundaries.png",
+        "anterior_ribs": "example_anterior_ribs_loss.png",
+        "wavy_clavicle": "example_wavy_clavicle.png",
+        "abnormal_organ_shape": "example_abnormal_organ_shape.png",
+    }
+    
+    filename = mapping.get(question_key)
+    if filename:
+        return os.path.join(example_images_dir, filename)
+    return None
+
 # 4. 메인 로직
 def main():
     st.title("🖼️ 합성 CXR 정밀 판독")
@@ -50,10 +77,9 @@ def main():
         st.error("지정된 폴더들에 이미지가 없습니다.")
         return
 
-    # 구글 시트 연결
+    # 구글 시트 연결 및 처리된 파일 확인
     sheet = get_google_sheet()
     processed_files = set()
-    
     if sheet:
         try:
             existing_data = sheet.get_all_values()
@@ -64,7 +90,7 @@ def main():
     else:
         return 
 
-    # 인덱스 찾기
+    # 시작 인덱스 찾기
     start_index = 0
     for i, img_path in enumerate(all_images):
         img_name = os.path.basename(img_path)
@@ -85,7 +111,7 @@ def main():
         st.balloons()
         return
 
-    # 현재 이미지 로드
+    # 현재 이미지 정보 로드
     current_idx = st.session_state.current_index
     current_image_path = all_images[current_idx]
     image_name = os.path.basename(current_image_path)
@@ -97,70 +123,100 @@ def main():
     st.caption(f"진행 상황: {current_idx + 1} / {total_images} | 폴더: {folder_name}")
 
     # ---------------------------------------------------------
-    # [레이아웃 변경] 좌우 분할 (1:1 비율)
+    # 레이아웃: 좌우 분할 (1:1)
     # ---------------------------------------------------------
-    col1, col2 = st.columns([1, 1]) # 왼쪽(이미지), 오른쪽(폼)
+    col_left, col_right = st.columns([1, 1])
 
-    # --- 왼쪽 컬럼: 이미지 표시 ---
-    with col1:
+    # --- 왼쪽 컬럼: 판독 대상 이미지 표시 ---
+    with col_left:
         if folder_name == "roentgen_10_440":
             st.warning("⚠️ **Low Quality** 합성 이미지")
         elif folder_name == "roentgen_75_440":
             st.success("✅ **High Quality** 합성 이미지")
         
-        # 이미지 꽉 채워서 표시
         st.image(current_image_path, caption=image_name, use_container_width=True)
 
     # --- 오른쪽 컬럼: 입력 폼 ---
-    with col2:
+    with col_right:
+        st.subheader("📝 합성 판단 근거")
         with st.form(key=f'labeling_form_{image_name}'):
-            st.subheader("📝 합성 판단 근거")
-            # st.info("해당하는 항목을 모두 체크해주세요.") # 공간 절약을 위해 생략 가능
-
-            defect_options = [
-                # 1. Texture
-                "[노이즈/질감] 전반적인 해상도 저하, 픽셀 깨짐 (Noise)",
-                "[노이즈/질감] 텍스트(L/R) 뭉개짐, 배경 아티팩트 (Artifacts)",
-                "[노이즈/질감] 경계면(피부/배경) 분리/섞임 (Boundary)",
-
-                # 2. Anatomy
-                "[해부학] 늑골(Rib) 개수 오류, 융합, 끊김 (Ribs)",
-                "[해부학] 쇄골/견갑골/척추 비대칭/기형 (Skeletal)",
-                "[해부학] 심장/횡격막 위치/모양 비현실적 (Organs)",
-                "[해부학] 투과도(Penetration) 물리 오류 (Physics)",
-
-                # 3. Lung
-                "[폐] 폐 혈관상(Vascular) 소실/뭉개짐 (Blur)",
-                "[폐] 해부학적으로 불가능한 혈관 주행 (Vessel Path)",
-                "[폐] 비정상적인 음영 패턴 (Abnormal Patterns)",
-                
-                # 4. Others
-                "기타 (아래 상세 판독문에 내용을 적어주세요)"
-            ]
-
-            selected_defects = []
             
-            # 체크박스 리스트
-            st.markdown("###### **이상 소견 선택**")
-            for option in defect_options:
-                unique_key = f"{option}_{image_name}"
-                if st.checkbox(option, key=unique_key):
-                    selected_defects.append(option)
+            selected_defects = []
 
-            st.markdown("---")
+            # --- [NEW] 질문 및 예시 이미지 표시 함수 ---
+            # 질문 텍스트, 내부 키값, 예시 이미지 키값을 받아 화면에 표시하는 헬퍼 함수
+            def add_question_with_example(label_text, internal_key, example_key=None):
+                # 질문 체크박스
+                if st.checkbox(label_text, key=f"{internal_key}_{image_name}"):
+                    selected_defects.append(label_text)
+                
+                # 예시 이미지가 있으면 확장형(expander)으로 표시
+                if example_key:
+                    example_path = get_example_image_path(example_key)
+                    if example_path and os.path.exists(example_path):
+                        with st.expander("📷 예시 이미지 보기"):
+                            st.image(example_path, caption=f"예시: {label_text}", use_container_width=True)
+                    # else:
+                    #     st.caption("※ 예시 이미지를 준비 중입니다.") # 필요 시 주석 해제
+
+            # --- 1. Texture ---
+            st.markdown("###### **[Texture]**")
+            add_question_with_example(
+                "1. 위치 마커(L/R) 오류 (Marker Artifacts)",
+                "q_marker",
+                "marker_error"
+            )
+            add_question_with_example(
+                "2. 비현실적 투과도 및 밀도 (Density & Penetration)",
+                "q_density",
+                "density_penetration"
+            )
+            add_question_with_example(
+                "3. 위장관/복부 가스 음영 오류 (Abnormal Gas Pattern)",
+                "q_gas",
+                "abnormal_gas"
+            )
+
+            st.divider()
+
+            # --- 2. Anatomy ---
+            st.markdown("###### **[Anatomy]**")
+            add_question_with_example(
+                "1. 구조물 경계 모호 (Vague Boundaries)",
+                "q_boundary",
+                "vague_boundaries"
+            )
+            add_question_with_example(
+                "2. 전방 늑골(Anterior Ribs) 소실/끊김",
+                "q_ribs",
+                "anterior_ribs"
+            )
+            add_question_with_example(
+                "3. 쇄골 형태 이상 (Wavy)",
+                "q_clavicle",
+                "wavy_clavicle"
+            )
+            add_question_with_example(
+                "4. 장기 모양 기형 (Abnormal Organ Shape)",
+                "q_organ_shape",
+                "abnormal_organ_shape"
+            )
+
+            st.divider()
+            
+            # --- 3. 기타 ---
+            add_question_with_example("기타 (아래 상세 내용 작성 필요)", "q_other")
 
             st.markdown("###### **상세 판독 (Description)**")
             detail_note = st.text_area(
                 "상세 내용 작성",
                 height=100,
-                placeholder="예: 우측 늑골 끊김 관찰됨.",
+                placeholder="예: 우측 상폐야에 비정상적인 음영 패턴 관찰됨.",
                 key=f"note_{image_name}",
-                label_visibility="collapsed" # 공간 절약을 위해 라벨 숨김
+                label_visibility="collapsed"
             )
             
-            # 버튼을 오른쪽 끝으로 보내고 싶다면 columns 사용 가능
-            # sub_col1, sub_col2 = st.columns([2, 1])
-            # with sub_col2:
+            st.markdown("") # 간격 추가
             submit_button = st.form_submit_button(label="저장 후 다음 >", type="primary", use_container_width=True)
 
     # ---------------------------------------------------------
