@@ -43,7 +43,7 @@ def load_image_paths(target_folders):
 # 각 질문 항목에 매칭될 예시 이미지의 경로를 반환하는 함수입니다.
 # 실제 이미지 파일이 존재하는 경로로 수정해야 합니다.
 def get_example_image_path(question_key):
-    example_images_dir = "example_images" # 예시 이미지가 저장된 폴더명
+    example_images_dir = "images" # 예시 이미지가 저장된 폴더명
     
     # 질문 키와 이미지 파일명 매핑
     mapping = {
@@ -69,7 +69,7 @@ def main():
     st.title("🖼️ 합성 CXR 정밀 판독")
     
     # 작업할 폴더 리스트
-    target_folders = ["roentgen_10_440", "roentgen_75_440", "images"]
+    target_folders = ["roentgen_10_440", "roentgen_75_440"]
     all_images = load_image_paths(target_folders)
     total_images = len(all_images)
     
@@ -255,4 +255,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
