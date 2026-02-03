@@ -48,15 +48,15 @@ def get_example_image_path(question_key):
     # 질문 키와 이미지 파일명 매핑
     mapping = {
         # Texture
-        "marker_error": "example_marker_error.png",
-        "density_penetration": "example_density_penetration.png",
-        "abnormal_gas": "example_abnormal_gas.png",
+        "marker_error": "texture1.png",
+        "density_penetration": "texture2.png",
+        "abnormal_gas": "texture3.png",
         
         # Anatomy
-        "vague_boundaries": "example_vague_boundaries.png",
-        "anterior_ribs": "example_anterior_ribs_loss.png",
-        "wavy_clavicle": "example_wavy_clavicle.png",
-        "abnormal_organ_shape": "example_abnormal_organ_shape.png",
+        "vague_boundaries": "anatomy1.png",
+        "anterior_ribs": "anatomy2.png",
+        "wavy_clavicle": "anatomy3.png",
+        "abnormal_organ_shape": "anatomy4.png",
     }
     
     filename = mapping.get(question_key)
@@ -69,7 +69,7 @@ def main():
     st.title("🖼️ 합성 CXR 정밀 판독")
     
     # 작업할 폴더 리스트
-    target_folders = ["roentgen_10_440", "roentgen_75_440"]
+    target_folders = ["roentgen_10_440", "roentgen_75_440", "images"]
     all_images = load_image_paths(target_folders)
     total_images = len(all_images)
     
@@ -255,3 +255,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
