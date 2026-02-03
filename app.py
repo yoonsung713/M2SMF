@@ -3,6 +3,7 @@ import os
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+from PIL import Image # 이미지 크기 조절을 위해 PIL 라이브러리 추가
 
 # 1. 페이지 설정 (반드시 최상단에 위치)
 st.set_page_config(page_title="합성 CXR 판독 도구", layout="wide")
@@ -67,6 +68,23 @@ def get_example_image_path(question_key):
         # 실제 경로 조합
         return os.path.join(example_images_dir, filename)
     return None
+
+# --- [NEW] 예시 이미지 크기 조절 함수 ---
+# 이미지 경로와 목표 높이를 입력받아 비율을 유지하며 리사이즈된 PIL 이미지 객체를 반환합니다.
+@st.cache_data(ttl=3600) # 성능을 위해 캐싱 적용 (1시간)
+def resize_image_pil(image_path, target_height):
+    try:
+        img = Image.open(image_path)
+        # 원본 비율 계산
+        aspect_ratio = img.width / img.height
+        # 목표 높이에 따른 너비 계산
+        new_width = int(target_height * aspect_ratio)
+        # 리사이즈 (LANCZOS 필터 사용)
+        resized_img = img.resize((new_width, target_height), Image.LANCZOS)
+        return resized_img
+    except Exception:
+        # 이미지 열기 실패 등의 경우 None 반환
+        return None
 
 # 4. 메인 로직
 def main():
@@ -202,10 +220,14 @@ def main():
                     # [오른쪽] 예시 이미지가 있으면 표시
                     if example_key:
                         example_path = get_example_image_path(example_key)
-                        # 파일 존재 여부 확인 (없으면 빈 공간 유지)
+                        # 파일 존재 여부 확인
                         if example_path and os.path.exists(example_path):
-                            # 캡션 없이 이미지만 작게 표시
-                            st.image(example_path, use_container_width=True)
+                            # --- [NEW] 이미지 리사이즈 (높이 68 고정) ---
+                            resized_img = resize_image_pil(example_path, target_height=68)
+                            if resized_img:
+                                # 리사이즈된 PIL 이미지 객체를 바로 st.image에 전달
+                                # use_container_width=False로 설정하여 리사이즈된 크기 그대로 표시
+                                st.image(resized_img, use_container_width=False)
                         # else:
                         #     # 이미지가 없을 때 대체 텍스트 표시 (선택 사항)
                         #     st.caption("(이미지 없음)")
