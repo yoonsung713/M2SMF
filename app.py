@@ -280,7 +280,7 @@ def main():
             st.markdown("##### **[Texture]**")
             # ✅ 수정됨: 여러 줄 문자열은 따옴표 세 개(""")를 사용해야 합니다.
             add_question_with_example(
-                """1. 위치 마커(L/R) 오류(Marker Artifacts) : 기존 '텍스트 뭉개짐'을 '위치 마커 오류'로 명확히 하고, 반전/위치 이상을 포함해 포괄적으로 정의""",
+                """1. 위치 마커(L/R) 오류(Marker Artifacts) : 기존 '텍스트 뭉개짐'을 반전/위치 이상을 포함해 포괄적으로 정의""",
                 "q_marker",
                 "marker_error"
             )
@@ -290,7 +290,7 @@ def main():
                 "density_penetration"
             )
             add_question_with_example(
-                """3. 위장관/복부 가스 음영 오류(Abnormal Gas Pattern) : 교수님께서 예시로 들어주신 '하얘야 하는데 시꺼멓게 있는 경우'를 '위장관 가스/음영 오류'로 구체화하여 추가""",
+                """3. 위장관/복부 가스 음영 오류(Abnormal Gas Pattern) : '하얘야 하는데 시꺼멓게 있는 경우'를 '위장관 가스/음영 오류'로 구체화하여 추가""",
                 "q_gas",
                 "abnormal_gas"
             )
@@ -390,3 +390,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
