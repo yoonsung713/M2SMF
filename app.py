@@ -70,7 +70,7 @@ SHEET_HEADERS = [
 def get_google_sheet():
     try:
         scope = [
-            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
         if "gcp_service_account" not in st.secrets:
@@ -550,5 +550,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
