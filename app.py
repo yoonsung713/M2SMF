@@ -67,7 +67,12 @@ SHEET_HEADERS = [
     "time_spent_sec",
 ]
 
-def get_google_sheet():
+def get_google_sheet(rater_id: str):
+    """
+    Rater별 워크시트(탭)에 기록.
+    - 탭 이름: R1, R2, R3, R4
+    - 없으면 자동 생성
+    """
     try:
         scope = [
             "https://www.googleapis.com/auth/spreadsheets",
@@ -79,7 +84,15 @@ def get_google_sheet():
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        ws = client.open(SHEET_NAME).get_worksheet(WORKSHEET_INDEX)
+
+        sh = client.open(SHEET_NAME)
+
+        # 1) rater_id 탭 가져오기 (없으면 생성)
+        try:
+            ws = sh.worksheet(rater_id)  # 탭 이름이 "R1" 같은 형태
+        except gspread.exceptions.WorksheetNotFound:
+            ws = sh.add_worksheet(title=rater_id, rows=2000, cols=len(SHEET_HEADERS))
+
         return ws
     except Exception as e:
         st.sidebar.error(f"Google Sheet 연결 실패: {e}")
@@ -327,7 +340,7 @@ def main():
     total_cases = len(assigned_cases)
 
     # Google Sheet
-    sheet = get_google_sheet()
+    sheet = get_google_sheet(rater_id)
     if sheet:
         ensure_sheet_header(sheet)
         st.sidebar.success(f"Connected: {sheet.spreadsheet.title} / {sheet.title}")
@@ -554,6 +567,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
