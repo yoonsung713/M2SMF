@@ -23,7 +23,7 @@ N_LQ_PER_RATER = 25
 
 # --- Optional (HIGHLY RECOMMENDED for npjDM): Anchor set for inter-rater agreement ---
 # If enabled: each rater sees the SAME anchor cases (e.g., 10 cases) + remaining unique cases
-ENABLE_ANCHOR_SET = False   # ← npjDM 설득력 강화하려면 True 권장
+ENABLE_ANCHOR_SET = True   # ← npjDM 설득력 강화하려면 True 권장
 ANCHOR_HQ = 5
 ANCHOR_LQ = 5
 
@@ -567,6 +567,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
