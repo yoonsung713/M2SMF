@@ -88,6 +88,7 @@ def ensure_sheet_header(sheet):
     """Create header row if sheet is empty or header mismatch."""
     try:
         values = sheet.get_all_values()
+        st.sidebar.write("secrets keys:", list(st.secrets.keys()))
         if len(values) == 0:
             sheet.append_row(SHEET_HEADERS)
             return
@@ -95,8 +96,9 @@ def ensure_sheet_header(sheet):
         # (You can manually create a new worksheet for this study if needed.)
         if values[0] != SHEET_HEADERS:
             st.warning("⚠️ Google Sheet의 헤더가 현재 앱과 다릅니다. (새 워크시트/새 시트 사용을 권장)")
-    except Exception:
-        pass
+    except Exception as e:
+        st.sidebar.error(f"Google Sheet 연결 실패: {e}")
+        return None
 
 def load_processed_image_ids(sheet, rater_id: str):
     """Return a set of image_ids already rated by this rater in this study."""
@@ -550,6 +552,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
