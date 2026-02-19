@@ -41,7 +41,7 @@ st.set_page_config(page_title="합성 CXR 품질 평가(QA)", layout="wide")
 # =========================================================
 # Google Sheets
 # =========================================================
-SHEET_NAME = "labeling_results"
+SHEET_NAME = "M2SMF_survey"
 WORKSHEET_INDEX = 0  # sheet1
 
 SHEET_HEADERS = [
@@ -550,3 +550,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
