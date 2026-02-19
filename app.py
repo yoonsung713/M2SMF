@@ -285,8 +285,6 @@ def artifact_radio(label_title, description, key_prefix, example_key=None):
 def main():
     st.title("🧪 합성 CXR 품질 평가(QA) 설문")
     st.caption("본 설문은 진단(CADx)이 아니라 합성데이터의 공유/학습 적합성(QA)을 평가하기 위한 것입니다.")
-    st.sidebar.write("secrets keys:", list(st.secrets.keys()))
-    st.sidebar.success(f"Connected: {sheet.spreadsheet.title} / {sheet.title}")
 
     # --- Sidebar: rater select + consent ---
     st.sidebar.header("참여자 설정")
@@ -330,6 +328,7 @@ def main():
     sheet = get_google_sheet()
     if sheet:
         ensure_sheet_header(sheet)
+        st.sidebar.success(f"Connected: {sheet.spreadsheet.title} / {sheet.title}")
 
     processed_ids = load_processed_image_ids(sheet, rater_id)
 
@@ -553,6 +552,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
