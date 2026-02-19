@@ -88,7 +88,6 @@ def ensure_sheet_header(sheet):
     """Create header row if sheet is empty or header mismatch."""
     try:
         values = sheet.get_all_values()
-        st.sidebar.write("secrets keys:", list(st.secrets.keys()))
         if len(values) == 0:
             sheet.append_row(SHEET_HEADERS)
             return
@@ -286,6 +285,7 @@ def artifact_radio(label_title, description, key_prefix, example_key=None):
 def main():
     st.title("🧪 합성 CXR 품질 평가(QA) 설문")
     st.caption("본 설문은 진단(CADx)이 아니라 합성데이터의 공유/학습 적합성(QA)을 평가하기 위한 것입니다.")
+    st.sidebar.write("secrets keys:", list(st.secrets.keys()))
 
     # --- Sidebar: rater select + consent ---
     st.sidebar.header("참여자 설정")
@@ -552,6 +552,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
