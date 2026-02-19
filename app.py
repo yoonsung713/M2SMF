@@ -308,7 +308,7 @@ def main():
         st.info("왼쪽 사이드바에서 평가자 코드를 선택해주세요.")
         st.stop()
 
-    consent = st.sidebar.checkbox("연구 안내를 읽었고, 자발적으로 참여에 동의합니다.")
+    consent = st.sidebar.checkbox("연구 안내를 읽었습니다.")
     if not consent:
         st.warning("설문을 진행하려면 동의 체크가 필요합니다.")
         st.stop()
@@ -567,6 +567,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
