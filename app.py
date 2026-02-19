@@ -81,8 +81,10 @@ def get_google_sheet():
         client = gspread.authorize(creds)
         ws = client.open(SHEET_NAME).get_worksheet(WORKSHEET_INDEX)
         return ws
-    except Exception:
+    except Exception as e:
+        st.sidebar.error(f"Google Sheet 연결 실패: {e}")
         return None
+
 
 def ensure_sheet_header(sheet):
     """Create header row if sheet is empty or header mismatch."""
@@ -552,6 +554,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
