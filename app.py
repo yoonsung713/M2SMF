@@ -301,7 +301,28 @@ def main():
     st.title("🧪 합성 CXR 품질 평가(QA) 설문")
     st.caption("본 설문은 진단(CADx)이 아니라 합성데이터의 공유/학습 적합성(QA)을 평가하기 위한 것입니다.")
 
-    st.markdown(unsafe_allow_html=True,)
+    st.markdown(
+    """
+    <style>
+    /* 왼쪽 이미지 패널을 스크롤 중에도 화면에 고정 */
+    .sticky-image {
+        position: sticky;
+        top: 1.25rem;         /* 상단 여백 */
+        height: calc(100vh - 2.5rem);
+        overflow: auto;        /* 이미지가 큰 경우 내부 스크롤 */
+        padding-right: 0.5rem;
+    }
+
+    /* (옵션) 오른쪽 QA 패널을 독립 스크롤로 만들고 싶을 때 */
+    .qa-panel {
+        height: calc(100vh - 2.5rem);
+        overflow-y: auto;
+        padding-right: 0.5rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+    )
 
     # --- Sidebar: rater select + consent ---
     st.sidebar.header("참여자 설정")
@@ -571,6 +592,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
