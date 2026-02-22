@@ -419,7 +419,10 @@ def main():
 
     with col_left:
         st.subheader("평가 대상 이미지")
+        # st.image(image_path, use_container_width=True)
+        st.markdown('<div class="column">', unsafe_allow_html=True)
         st.image(image_path, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         
     with col_right:
         st.subheader("📝 평가 입력 (QA 목적)")
@@ -592,6 +595,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
