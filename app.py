@@ -301,6 +301,8 @@ def main():
     st.title("🧪 합성 CXR 품질 평가(QA) 설문")
     st.caption("본 설문은 진단(CADx)이 아니라 합성데이터의 공유/학습 적합성(QA)을 평가하기 위한 것입니다.")
 
+    st.markdown(unsafe_allow_html=True,)
+
     # --- Sidebar: rater select + consent ---
     st.sidebar.header("참여자 설정")
     rater_id = st.sidebar.selectbox("평가자 코드", options=RATER_OPTIONS, index=0)
@@ -395,6 +397,8 @@ def main():
     with col_left:
         st.subheader("평가 대상 이미지")
         st.image(image_path, use_container_width=True)
+        st.image(image_path, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_right:
         st.subheader("📝 평가 입력 (QA 목적)")
@@ -567,6 +571,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
