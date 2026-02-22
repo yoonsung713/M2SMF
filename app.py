@@ -304,6 +304,23 @@ def main():
     st.markdown(
     """
     <style>
+    /* 컬럼 간격 약간 안정화 */
+    div[data-testid="column"] {
+        padding-top: 0.25rem;
+    }
+    
+    /* 왼쪽 컬럼(첫 번째 컬럼) 안의 컨텐츠를 sticky로 */
+    div[data-testid="column"]:first-child > div {
+        position: sticky;
+        top: 4.5rem;   /* 상단(헤더) 높이에 맞춰 조절 */
+        align-self: flex-start;
+    }
+    
+    /* 이미지가 너무 커서 화면 밖으로 나가면 보기 힘드니, 최대 높이 제한(선택) */
+    div[data-testid="column"]:first-child img {
+        max-height: 80vh;
+        object-fit: contain;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -575,6 +592,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
