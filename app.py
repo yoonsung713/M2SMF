@@ -301,27 +301,6 @@ def main():
     st.title("🧪 합성 CXR 품질 평가(QA) 설문")
     st.caption("본 설문은 진단(CADx)이 아니라 합성데이터의 공유/학습 적합성(QA)을 평가하기 위한 것입니다.")
 
-    st.markdown(
-    """
-    <style>
-    /* 이미지 컨테이너를 스크롤 중 상단에 붙게(sticky) */
-    .sticky-img {
-      position: sticky;
-      top: 1rem;                 /* 상단 여백 */
-      align-self: flex-start;
-      z-index: 10;
-    }
-    
-    /* 너무 큰 이미지가 화면을 넘지 않게 (선택) */
-    .sticky-img img {
-      max-height: calc(100vh - 6rem);
-      object-fit: contain;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-    )
-
     # --- Sidebar: rater select + consent ---
     st.sidebar.header("참여자 설정")
     rater_id = st.sidebar.selectbox("평가자 코드", options=RATER_OPTIONS, index=0)
@@ -415,114 +394,216 @@ def main():
 
     with col_left:
         st.subheader("평가 대상 이미지")
-        # st.image(image_path, use_container_width=True)
-        st.markdown('<div class="sticky-img">', unsafe_allow_html=True)
         st.image(image_path, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
         
+    # with col_right:
+    #     st.subheader("📝 평가 입력 (QA 목적)")
+
+    #     with st.form(key=f"form_{rater_id}_{case_hash}"):
+
+    #         # --- (A) Quality score 1-5 ---
+    #         with st.expander("품질 점수 기준(1–5) 보기", expanded=False):
+    #             st.markdown(
+    #                 "- **1점(매우 낮음)**: 합성 흔적/비현실성이 뚜렷하여 데이터로 쓰기 어려움\n"
+    #                 "- **2점(낮음)**: 인공적인 흔적이 자주 보여 품질이 낮다고 판단\n"
+    #                 "- **3점(보통/애매)**: 일부는 자연스럽지만 일부는 의심/불일치(경계선)\n"
+    #                 "- **4점(높음)**: 대부분 자연스럽고 데이터로 활용 가능해 보임\n"
+    #                 "- **5점(매우 높음)**: 실제와 구별이 매우 어렵고 전반적으로 매우 자연스러움"
+    #             )
+
+    #         quality_score = st.selectbox(
+    #             "A) 합성 CXR 품질 점수 (1–5)",
+    #             options=["선택", "1", "2", "3", "4", "5"],
+    #             index=0,
+    #             key=f"quality_{case_hash}",
+    #         )
+
+    #         # --- (B) Release recommend ---
+    #         release = st.selectbox(
+    #             "B) 데이터 공유/학습에 사용 가능(Release 추천) 여부",
+    #             options=["선택", "Yes", "No"],
+    #             index=0,
+    #             key=f"release_{case_hash}",
+    #         )
+
+    #         st.markdown("---")
+    #         st.markdown("##### **C) 합성 흔적(artifact) 체크리스트 (O/X/N/A)**")
+    #         st.caption("각 항목은 ‘있음(O) / 없음(X) / 판단 불가(N/A)’ 중 하나를 선택해주세요.")
+
+    #         # --- Artifact items (Texture / Anatomy) ---
+    #         a_marker = artifact_radio(
+    #             "1) 위치 마커(L/R) 오류 (Marker Artifacts)",
+    #             "L/R 마커 반전, 위치 이상, 글자 형태 부자연스러움 등",
+    #             key_prefix=f"art_marker_{case_hash}",
+    #             example_key="marker_error"
+    #         )
+    #         a_density = artifact_radio(
+    #             "2) 비현실적 투과도/밀도 (Density & Penetration)",
+    #             "얼룩, 물리적으로 어색한 밀도 표현(예: 뼈가 가장 하얗게 보이지 않음 등)",
+    #             key_prefix=f"art_density_{case_hash}",
+    #             example_key="density_penetration"
+    #         )
+    #         a_gas = artifact_radio(
+    #             "3) 위장관/복부 가스 음영 오류 (Abnormal Gas Pattern)",
+    #             "하부 흉부/상복부 음영이 비현실적(가스/음영 패턴 이상)",
+    #             key_prefix=f"art_gas_{case_hash}",
+    #             example_key="abnormal_gas"
+    #         )
+
+    #         st.markdown("---")
+
+    #         a_boundary = artifact_radio(
+    #             "4) 구조물 경계 모호 (Vague Boundaries)",
+    #             "피부/장기/뼈 윤곽 경계가 전반적으로 흐리거나 붕괴",
+    #             key_prefix=f"art_boundary_{case_hash}",
+    #             example_key="vague_boundaries"
+    #         )
+    #         a_ribs = artifact_radio(
+    #             "5) 전방 늑골 소실/끊김 (Anterior Ribs)",
+    #             "후방 늑골은 보이는데 전방 늑골이 약하거나 끊김",
+    #             key_prefix=f"art_ribs_{case_hash}",
+    #             example_key="anterior_ribs"
+    #         )
+    #         a_clavicle = artifact_radio(
+    #             "6) 쇄골 형태 이상 (Wavy clavicle)",
+    #             "쇄골 라인이 울퉁불퉁/물결 모양으로 부자연스러움",
+    #             key_prefix=f"art_clavicle_{case_hash}",
+    #             example_key="wavy_clavicle"
+    #         )
+    #         a_organ = artifact_radio(
+    #             "7) 장기 모양 기형 (Abnormal Organ Shape)",
+    #             "심장/횡격막 등 장기 윤곽 자체가 비현실적",
+    #             key_prefix=f"art_organ_{case_hash}",
+    #             example_key="abnormal_organ_shape"
+    #         )
+
+    #         st.markdown("---")
+
+    #         other_flag = st.selectbox(
+    #             "D) 기타(위 항목 외의 부자연스러움) 존재 여부",
+    #             options=["선택", "Yes", "No"],
+    #             index=0,
+    #             key=f"other_{case_hash}",
+    #         )
+
+    #         comment = st.text_area(
+    #             "E) (선택) 코멘트 1줄 — 부자연스러운 부위/이유를 짧게 기록",
+    #             height=90,
+    #             placeholder="예: 우측 상폐야 경계가 비정상적으로 뭉개짐. / L 마커가 비정상적으로 왜곡됨.",
+    #             key=f"comment_{case_hash}",
+    #         )
+
+    #         confirm_all_checked = st.checkbox(
+    #             "위 7개 artifact 항목을 모두 확인했습니다.",
+    #             key=f"confirm_{case_hash}"
+    #         )
+
+    #         submit = st.form_submit_button("💾 저장하고 다음으로", type="primary", use_container_width=True)
+
     with col_right:
         st.subheader("📝 평가 입력 (QA 목적)")
 
-        with st.form(key=f"form_{rater_id}_{case_hash}"):
-
-            # --- (A) Quality score 1-5 ---
-            with st.expander("품질 점수 기준(1–5) 보기", expanded=False):
-                st.markdown(
-                    "- **1점(매우 낮음)**: 합성 흔적/비현실성이 뚜렷하여 데이터로 쓰기 어려움\n"
-                    "- **2점(낮음)**: 인공적인 흔적이 자주 보여 품질이 낮다고 판단\n"
-                    "- **3점(보통/애매)**: 일부는 자연스럽지만 일부는 의심/불일치(경계선)\n"
-                    "- **4점(높음)**: 대부분 자연스럽고 데이터로 활용 가능해 보임\n"
-                    "- **5점(매우 높음)**: 실제와 구별이 매우 어렵고 전반적으로 매우 자연스러움"
+        # 오른쪽만 스크롤되도록 컨테이너 생성 (값은 화면에 맞게 조절)
+        qa_box = st.container(height=720, border=True)
+    
+        with qa_box:
+            with st.form(key=f"form_{rater_id}_{case_hash}"):
+    
+                with st.expander("품질 점수 기준(1–5) 보기", expanded=False):
+                    st.markdown(
+                        "- **1점(매우 낮음)**: 합성 흔적/비현실성이 뚜렷하여 데이터로 쓰기 어려움\n"
+                        "- **2점(낮음)**: 인공적인 흔적이 자주 보여 품질이 낮다고 판단\n"
+                        "- **3점(보통/애매)**: 일부는 자연스럽지만 일부는 의심/불일치(경계선)\n"
+                        "- **4점(높음)**: 대부분 자연스럽고 데이터로 활용 가능해 보임\n"
+                        "- **5점(매우 높음)**: 실제와 구별이 매우 어렵고 전반적으로 매우 자연스러움"
+                    )
+    
+                quality_score = st.selectbox(
+                    "A) 합성 CXR 품질 점수 (1–5)",
+                    options=["선택", "1", "2", "3", "4", "5"],
+                    index=0,
+                    key=f"quality_{case_hash}",
                 )
-
-            quality_score = st.selectbox(
-                "A) 합성 CXR 품질 점수 (1–5)",
-                options=["선택", "1", "2", "3", "4", "5"],
-                index=0,
-                key=f"quality_{case_hash}",
-            )
-
-            # --- (B) Release recommend ---
-            release = st.selectbox(
-                "B) 데이터 공유/학습에 사용 가능(Release 추천) 여부",
-                options=["선택", "Yes", "No"],
-                index=0,
-                key=f"release_{case_hash}",
-            )
-
-            st.markdown("---")
-            st.markdown("##### **C) 합성 흔적(artifact) 체크리스트 (O/X/N/A)**")
-            st.caption("각 항목은 ‘있음(O) / 없음(X) / 판단 불가(N/A)’ 중 하나를 선택해주세요.")
-
-            # --- Artifact items (Texture / Anatomy) ---
-            a_marker = artifact_radio(
-                "1) 위치 마커(L/R) 오류 (Marker Artifacts)",
-                "L/R 마커 반전, 위치 이상, 글자 형태 부자연스러움 등",
-                key_prefix=f"art_marker_{case_hash}",
-                example_key="marker_error"
-            )
-            a_density = artifact_radio(
-                "2) 비현실적 투과도/밀도 (Density & Penetration)",
-                "얼룩, 물리적으로 어색한 밀도 표현(예: 뼈가 가장 하얗게 보이지 않음 등)",
-                key_prefix=f"art_density_{case_hash}",
-                example_key="density_penetration"
-            )
-            a_gas = artifact_radio(
-                "3) 위장관/복부 가스 음영 오류 (Abnormal Gas Pattern)",
-                "하부 흉부/상복부 음영이 비현실적(가스/음영 패턴 이상)",
-                key_prefix=f"art_gas_{case_hash}",
-                example_key="abnormal_gas"
-            )
-
-            st.markdown("---")
-
-            a_boundary = artifact_radio(
-                "4) 구조물 경계 모호 (Vague Boundaries)",
-                "피부/장기/뼈 윤곽 경계가 전반적으로 흐리거나 붕괴",
-                key_prefix=f"art_boundary_{case_hash}",
-                example_key="vague_boundaries"
-            )
-            a_ribs = artifact_radio(
-                "5) 전방 늑골 소실/끊김 (Anterior Ribs)",
-                "후방 늑골은 보이는데 전방 늑골이 약하거나 끊김",
-                key_prefix=f"art_ribs_{case_hash}",
-                example_key="anterior_ribs"
-            )
-            a_clavicle = artifact_radio(
-                "6) 쇄골 형태 이상 (Wavy clavicle)",
-                "쇄골 라인이 울퉁불퉁/물결 모양으로 부자연스러움",
-                key_prefix=f"art_clavicle_{case_hash}",
-                example_key="wavy_clavicle"
-            )
-            a_organ = artifact_radio(
-                "7) 장기 모양 기형 (Abnormal Organ Shape)",
-                "심장/횡격막 등 장기 윤곽 자체가 비현실적",
-                key_prefix=f"art_organ_{case_hash}",
-                example_key="abnormal_organ_shape"
-            )
-
-            st.markdown("---")
-
-            other_flag = st.selectbox(
-                "D) 기타(위 항목 외의 부자연스러움) 존재 여부",
-                options=["선택", "Yes", "No"],
-                index=0,
-                key=f"other_{case_hash}",
-            )
-
-            comment = st.text_area(
-                "E) (선택) 코멘트 1줄 — 부자연스러운 부위/이유를 짧게 기록",
-                height=90,
-                placeholder="예: 우측 상폐야 경계가 비정상적으로 뭉개짐. / L 마커가 비정상적으로 왜곡됨.",
-                key=f"comment_{case_hash}",
-            )
-
-            confirm_all_checked = st.checkbox(
-                "위 7개 artifact 항목을 모두 확인했습니다.",
-                key=f"confirm_{case_hash}"
-            )
-
-            submit = st.form_submit_button("💾 저장하고 다음으로", type="primary", use_container_width=True)
+    
+                release = st.selectbox(
+                    "B) 데이터 공유/학습에 사용 가능(Release 추천) 여부",
+                    options=["선택", "Yes", "No"],
+                    index=0,
+                    key=f"release_{case_hash}",
+                )
+    
+                st.markdown("---")
+                st.markdown("##### **C) 합성 흔적(artifact) 체크리스트 (O/X/N/A)**")
+                st.caption("각 항목은 ‘있음(O) / 없음(X) / 판단 불가(N/A)’ 중 하나를 선택해주세요.")
+    
+                a_marker = artifact_radio(
+                    "1) 위치 마커(L/R) 오류 (Marker Artifacts)",
+                    "L/R 마커 반전, 위치 이상, 글자 형태 부자연스러움 등",
+                    key_prefix=f"art_marker_{case_hash}",
+                    example_key="marker_error"
+                )
+                a_density = artifact_radio(
+                    "2) 비현실적 투과도/밀도 (Density & Penetration)",
+                    "얼룩, 물리적으로 어색한 밀도 표현(예: 뼈가 가장 하얗게 보이지 않음 등)",
+                    key_prefix=f"art_density_{case_hash}",
+                    example_key="density_penetration"
+                )
+                a_gas = artifact_radio(
+                    "3) 위장관/복부 가스 음영 오류 (Abnormal Gas Pattern)",
+                    "하부 흉부/상복부 음영이 비현실적(가스/음영 패턴 이상)",
+                    key_prefix=f"art_gas_{case_hash}",
+                    example_key="abnormal_gas"
+                )
+    
+                st.markdown("---")
+    
+                a_boundary = artifact_radio(
+                    "4) 구조물 경계 모호 (Vague Boundaries)",
+                    "피부/장기/뼈 윤곽 경계가 전반적으로 흐리거나 붕괴",
+                    key_prefix=f"art_boundary_{case_hash}",
+                    example_key="vague_boundaries"
+                )
+                a_ribs = artifact_radio(
+                    "5) 전방 늑골 소실/끊김 (Anterior Ribs)",
+                    "후방 늑골은 보이는데 전방 늑골이 약하거나 끊김",
+                    key_prefix=f"art_ribs_{case_hash}",
+                    example_key="anterior_ribs"
+                )
+                a_clavicle = artifact_radio(
+                    "6) 쇄골 형태 이상 (Wavy clavicle)",
+                    "쇄골 라인이 울퉁불퉁/물결 모양으로 부자연스러움",
+                    key_prefix=f"art_clavicle_{case_hash}",
+                    example_key="wavy_clavicle"
+                )
+                a_organ = artifact_radio(
+                    "7) 장기 모양 기형 (Abnormal Organ Shape)",
+                    "심장/횡격막 등 장기 윤곽 자체가 비현실적",
+                    key_prefix=f"art_organ_{case_hash}",
+                    example_key="abnormal_organ_shape"
+                )
+    
+                st.markdown("---")
+    
+                other_flag = st.selectbox(
+                    "D) 기타(위 항목 외의 부자연스러움) 존재 여부",
+                    options=["선택", "Yes", "No"],
+                    index=0,
+                    key=f"other_{case_hash}",
+                )
+    
+                comment = st.text_area(
+                    "E) (선택) 코멘트 1줄 — 부자연스러운 부위/이유를 짧게 기록",
+                    height=90,
+                    placeholder="예: 우측 상폐야 경계가 비정상적으로 뭉개짐. / L 마커가 비정상적으로 왜곡됨.",
+                    key=f"comment_{case_hash}",
+                )
+    
+                confirm_all_checked = st.checkbox(
+                    "위 7개 artifact 항목을 모두 확인했습니다.",
+                    key=f"confirm_{case_hash}"
+                )
+    
+                submit = st.form_submit_button("💾 저장하고 다음으로", type="primary", use_container_width=True)
 
         # Save logic (outside form)
         if submit:
@@ -591,6 +672,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
