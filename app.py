@@ -304,26 +304,22 @@ def main():
     st.markdown(
     """
     <style>
-    /* 컬럼 간격 약간 안정화 */
-    div[data-testid="column"] {
-        padding-top: 0.25rem;
+    /* 이미지 컨테이너를 스크롤 중 상단에 붙게(sticky) */
+    .sticky-img {
+      position: sticky;
+      top: 1rem;                 /* 상단 여백 */
+      align-self: flex-start;
+      z-index: 10;
     }
     
-    /* 왼쪽 컬럼(첫 번째 컬럼) 안의 컨텐츠를 sticky로 */
-    div[data-testid="column"]:first-child > div {
-        position: sticky;
-        top: 4.5rem;   /* 상단(헤더) 높이에 맞춰 조절 */
-        align-self: flex-start;
-    }
-    
-    /* 이미지가 너무 커서 화면 밖으로 나가면 보기 힘드니, 최대 높이 제한(선택) */
-    div[data-testid="column"]:first-child img {
-        max-height: 80vh;
-        object-fit: contain;
+    /* 너무 큰 이미지가 화면을 넘지 않게 (선택) */
+    .sticky-img img {
+      max-height: calc(100vh - 6rem);
+      object-fit: contain;
     }
     </style>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_html=True
     )
 
     # --- Sidebar: rater select + consent ---
@@ -420,7 +416,7 @@ def main():
     with col_left:
         st.subheader("평가 대상 이미지")
         # st.image(image_path, use_container_width=True)
-        st.markdown('<div class="column">', unsafe_allow_html=True)
+        st.markdown('<div class="sticky-img">', unsafe_allow_html=True)
         st.image(image_path, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
@@ -595,6 +591,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
