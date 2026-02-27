@@ -522,8 +522,8 @@ def main():
                     b("E) (선택) 코멘트 1줄 — 부자연스러운 부위/이유를 짧게 기록",
                       "E) (Optional) One-line comment — location/reason of unnaturalness"),
                     height=90,
-                    placeholder=b("예: 우측 상폐야 경계가 비정상적으로 뭉개짐. / L 마커가 비정상적으로 왜곡됨.",
-                                  "e.g., Right upper lung boundary is unnaturally blurred. / L marker is distorted."),
+                    placeholder=b("예: 우측 상폐야 경계가 비정상적으로 뭉개짐.",
+                                  "e.g., Right upper lung boundary is unnaturally blurred."),
                     key=f"comment_{case_hash}",
                 )
 
@@ -603,3 +603,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
