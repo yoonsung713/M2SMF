@@ -12,7 +12,6 @@ from PIL import Image
 # Bilingual helper (Korean / English)
 # =========================================================
 def b(ko: str, en: str) -> str:
-    """Return bilingual label text: Korean / English."""
     return f"{ko} / {en}"
 
 # =========================================================
@@ -41,9 +40,10 @@ LQ_FOLDERS = ["roentgen_10_440"]  # low quality generation setting (hidden from 
 EXAMPLE_IMAGES_DIR = "images"
 
 # Streamlit page
-st.set_page_config(page_title=b("합성 CXR 품질 평가(QA)", "Synthetic CXR Quality Assessment (QA)"),
-                   layout="wide")
-
+st.set_page_config(
+    page_title=b("합성 CXR 품질 평가(QA)", "Synthetic CXR Quality Assessment (QA)"),
+    layout="wide"
+)
 
 # =========================================================
 # Google Sheets
@@ -59,7 +59,7 @@ SHEET_HEADERS = [
     "case_order",
     "case_hash",
     "image_id",
-    "source_quality_hidden",  # HQ/LQ (hidden from rater UI)
+    "source_quality_hidden",
     "quality_score_1to5",
     "release_recommend_yesno",
     "artifact_marker_OXN",
@@ -94,9 +94,8 @@ def get_google_sheet(rater_id: str):
 
         sh = client.open(SHEET_NAME)
 
-        # 1) rater_id 탭 가져오기 (없으면 생성)
         try:
-            ws = sh.worksheet(rater_id)  # tab name like "R1"
+            ws = sh.worksheet(rater_id)
         except gspread.exceptions.WorksheetNotFound:
             ws = sh.add_worksheet(title=rater_id, rows=2000, cols=len(SHEET_HEADERS))
 
@@ -119,6 +118,7 @@ def ensure_sheet_header(sheet):
     except Exception as e:
         st.sidebar.error(b("Google Sheet 연결 실패", "Google Sheet connection failed") + f": {e}")
         return None
+
 
 def load_processed_image_ids(sheet, rater_id: str):
     """Return a set of image_ids already rated by this rater in this study."""
@@ -167,6 +167,7 @@ def make_image_id(image_path: str) -> str:
 def hash_case(image_id: str) -> str:
     return hashlib.sha1(image_id.encode("utf-8")).hexdigest()[:10]
 
+
 def get_example_image_path(question_key):
     mapping = {
         "marker_error": "texture1.png",
@@ -198,8 +199,14 @@ def resize_image_pil(image_path, target_height):
 # Assignment (balanced + blinded)
 # =========================================================
 def build_case_list_for_rater(hq_paths, lq_paths, rater_id: str):
-    rater_index = int(rater_id.replace("R", "")) - 1  # R1->0
-    rng = random.Random(f"{STUDY_ID}_{APP_VERSION}_{rater_id}")  # deterministic
+    """
+    Deterministic, disjoint assignment across raters:
+      - partition each pool by rater_index using slicing [idx::NUM_RATERS]
+      - sample N_HQ_PER_RATER and N_LQ_PER_RATER from each partition
+      - shuffle order with a fixed seed for reproducibility
+    """
+    rater_index = int(rater_id.replace("R", "")) - 1
+    rng = random.Random(f"{STUDY_ID}_{APP_VERSION}_{rater_id}")
 
     hq_partition = hq_paths[rater_index::NUM_RATERS]
     lq_partition = lq_paths[rater_index::NUM_RATERS]
@@ -304,6 +311,12 @@ def main():
                   "Please select your rater ID from the left sidebar."))
         st.stop()
 
+    # ✅ FIX 1: Detect rater change & reset per-rater session state
+    if st.session_state.get("active_rater_id") != rater_id:
+        st.session_state["active_rater_id"] = rater_id
+        st.session_state["timer_case_idx"] = None
+        st.session_state["case_start_time"] = time.time()
+
     consent = st.sidebar.checkbox(b("연구 안내를 읽었습니다.", "I have read the study information."))
     if not consent:
         st.warning(b("설문을 진행하려면 동의 체크가 필요합니다.",
@@ -330,7 +343,7 @@ def main():
                    "No images found in HQ/LQ folders. Please check folder paths/files."))
         st.stop()
 
-    # Build assignment (balanced + disjoint)
+    # Build assignment
     try:
         assigned_cases = build_case_list_for_rater(hq_paths, lq_paths, rater_id)
     except Exception as e:
@@ -348,28 +361,25 @@ def main():
     processed_ids = load_processed_image_ids(sheet, rater_id)
 
     # Find first unprocessed index
-    start_index = 0
+    start_index = total_cases
     for i, c in enumerate(assigned_cases):
         img_id = make_image_id(c["path"])
         if img_id not in processed_ids:
             start_index = i
             break
-        if i == total_cases - 1 and img_id in processed_ids:
-            start_index = total_cases
 
-    if "current_index" not in st.session_state:
-        st.session_state.current_index = start_index
-    else:
-        st.session_state.current_index = max(st.session_state.current_index, start_index)
+    # ✅ FIX 2: Always set current_index to start_index (computed per rater from sheet)
+    st.session_state["current_index"] = start_index
 
-    if st.session_state.current_index >= total_cases:
+    # Done?
+    if st.session_state["current_index"] >= total_cases:
         st.success(b("🎉 모든 배정 케이스 평가가 완료되었습니다. 감사합니다!",
                      "🎉 You have completed all assigned cases. Thank you!"))
         st.balloons()
         return
 
     # Current case
-    current_idx = st.session_state.current_index
+    current_idx = st.session_state["current_index"]
     case = assigned_cases[current_idx]
     image_path = case["path"]
     image_id = make_image_id(image_path)
@@ -580,7 +590,7 @@ def main():
                     try:
                         sheet.append_row(row)
                         st.toast(b("✅ 저장 완료", "✅ Saved") + f" (Case {current_idx + 1}/{total_cases})")
-                        st.session_state.current_index += 1
+                        # current_index will be recomputed from sheet on rerun
                         st.rerun()
                     except Exception as e:
                         st.error(b("구글 시트 저장 중 오류", "Error while saving to Google Sheet") + f": {e}")
@@ -588,7 +598,6 @@ def main():
                     st.warning(b("⚠️ 구글 시트가 연결되지 않았습니다(테스트 모드).",
                                  "⚠️ Google Sheet not connected (test mode)."))
                     st.info(b("저장 데이터 미리보기", "Preview saved row") + f":\n{row}")
-                    st.session_state.current_index += 1
                     st.rerun()
 
 
