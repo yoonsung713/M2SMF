@@ -349,9 +349,6 @@ def main():
         st.stop()
 
     cfg = RATER_CONFIG[rater_id]
-    st.sidebar.divider()
-    st.sidebar.markdown("**" + b("평가자 정보", "Rater Info") + "**")
-    st.sidebar.caption(f"{rater_id} / {cfg['display_name']}")
 
     st.sidebar.divider()
     st.sidebar.markdown("**" + b("평가 원칙", "Rating Principles") + "**")
