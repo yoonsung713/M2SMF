@@ -15,26 +15,41 @@ def b(ko: str, en: str) -> str:
     return f"{ko} / {en}"
 
 # =========================================================
-# Study / App Config (npjDM-friendly)
+# Study / App Config
 # =========================================================
-APP_VERSION = "M2SMF_QA_SURVEY_v1.0"
+APP_VERSION = "M2SMF_QA_SURVEY_v2.1"
 STUDY_ID = "M2SMF_Synthetic_CXR_QA"
 
-NUM_RATERS = 4
-RATER_OPTIONS = [b("선택", "Select")] + [f"R{i}" for i in range(1, NUM_RATERS + 1)]
+# Jin(R1)은 이미 완료했으므로 제외
+# Yang 추가 10장은 R4_extra로 별도 저장 권장
+RATER_CONFIG = {
+    "R2": {
+        "display_name": "Lee",
+        "hq_folders": ["Lee/HQ"],
+        "lq_folders": ["Lee/LQ"],
+        "n_hq": 25,
+        "n_lq": 25,
+    },
+    "R3": {
+        "display_name": "Song",
+        "hq_folders": ["Song/HQ"],
+        "lq_folders": ["Song/LQ"],
+        "n_hq": 25,
+        "n_lq": 25,
+    },
+    "R4_extra": {
+        "display_name": "Yang (Extra 10)",
+        "hq_folders": ["Yang_extra/HQ"],
+        "lq_folders": ["Yang_extra/LQ"],
+        "n_hq": 5,
+        "n_lq": 5,
+    },
+}
 
-# Each rater sees 50 total (25 HQ + 25 LQ) by default
-N_HQ_PER_RATER = 25
-N_LQ_PER_RATER = 25
+RATER_OPTIONS = [b("선택", "Select")] + list(RATER_CONFIG.keys())
 
-# --- Optional (HIGHLY RECOMMENDED for npjDM): Anchor set for inter-rater agreement ---
-ENABLE_ANCHOR_SET = True
-ANCHOR_HQ = 5
-ANCHOR_LQ = 5
-
-# Folder settings
-HQ_FOLDERS = ["roentgen_75_440"]  # high quality generation setting (hidden from rater)
-LQ_FOLDERS = ["roentgen_10_440"]  # low quality generation setting (hidden from rater)
+# Anchor set 사용 안 함
+ENABLE_ANCHOR_SET = False
 
 # Example images folder for artifact guidance
 EXAMPLE_IMAGES_DIR = "images"
@@ -49,7 +64,6 @@ st.set_page_config(
 # Google Sheets
 # =========================================================
 SHEET_NAME = "M2SMF_survey"
-WORKSHEET_INDEX = 0  # sheet1
 
 SHEET_HEADERS = [
     "timestamp",
@@ -76,9 +90,8 @@ SHEET_HEADERS = [
 
 def get_google_sheet(rater_id: str):
     """
-    Rater별 워크시트(탭)에 기록. / Log to each rater worksheet(tab).
-    - 탭 이름: R1, R2, R3, R4
-    - 없으면 자동 생성 / Auto-create if not exists
+    rater_id별 워크시트(탭)에 기록.
+    예: R2, R3, R4_extra
     """
     try:
         scope = [
@@ -106,29 +119,32 @@ def get_google_sheet(rater_id: str):
 
 
 def ensure_sheet_header(sheet):
-    """Create header row if sheet is empty or header mismatch."""
     try:
         values = sheet.get_all_values()
         if len(values) == 0:
             sheet.append_row(SHEET_HEADERS)
             return
         if values[0] != SHEET_HEADERS:
-            st.warning(b("⚠️ Google Sheet의 헤더가 현재 앱과 다릅니다. (새 워크시트/새 시트 사용을 권장)",
-                         "⚠️ Google Sheet header differs from this app. (Recommended: use a new worksheet/sheet)"))
+            st.warning(
+                b(
+                    "⚠️ Google Sheet의 헤더가 현재 앱과 다릅니다. 새 워크시트/새 시트 사용을 권장합니다.",
+                    "⚠️ Google Sheet header differs from this app. A new worksheet/sheet is recommended."
+                )
+            )
     except Exception as e:
         st.sidebar.error(b("Google Sheet 연결 실패", "Google Sheet connection failed") + f": {e}")
-        return None
 
 
 def load_processed_image_ids(sheet, rater_id: str):
-    """Return a set of image_ids already rated by this rater in this study."""
     processed = set()
     if not sheet:
         return processed
+
     try:
         rows = sheet.get_all_values()
         if len(rows) <= 1:
             return processed
+
         header = rows[0]
         idx_study = header.index("study_id") if "study_id" in header else 1
         idx_rater = header.index("rater_id") if "rater_id" in header else 3
@@ -141,6 +157,7 @@ def load_processed_image_ids(sheet, rater_id: str):
                 processed.add(row[idx_imgid])
     except Exception:
         pass
+
     return processed
 
 
@@ -159,13 +176,24 @@ def load_image_paths(target_folders):
                         image_paths.append(os.path.join(root, file))
     return sorted(image_paths)
 
+
 def make_image_id(image_path: str) -> str:
-    folder = os.path.basename(os.path.dirname(image_path))
-    fname = os.path.basename(image_path)
-    return f"{folder}/{fname}"
+    # 예: Lee/HQ/demo123.jpg 또는 Yang_extra/LQ/demo456.jpg
+    norm_path = os.path.normpath(image_path).replace("\\", "/")
+    return norm_path
+
 
 def hash_case(image_id: str) -> str:
     return hashlib.sha1(image_id.encode("utf-8")).hexdigest()[:10]
+
+
+def infer_source_quality_from_path(image_path: str) -> str:
+    norm = os.path.normpath(image_path).replace("\\", "/").lower()
+    if "/hq/" in norm:
+        return "HQ"
+    if "/lq/" in norm:
+        return "LQ"
+    return "UNKNOWN"
 
 
 def get_example_image_path(question_key):
@@ -183,6 +211,7 @@ def get_example_image_path(question_key):
         return os.path.join(EXAMPLE_IMAGES_DIR, filename)
     return None
 
+
 @st.cache_data(ttl=3600)
 def resize_image_pil(image_path, target_height):
     try:
@@ -196,57 +225,39 @@ def resize_image_pil(image_path, target_height):
 
 
 # =========================================================
-# Assignment (balanced + blinded)
+# Assignment (folder-based only)
 # =========================================================
 def build_case_list_for_rater(hq_paths, lq_paths, rater_id: str):
     """
-    Deterministic, disjoint assignment across raters:
-      - partition each pool by rater_index using slicing [idx::NUM_RATERS]
-      - sample N_HQ_PER_RATER and N_LQ_PER_RATER from each partition
-      - shuffle order with a fixed seed for reproducibility
+    각 평가자는 자기 폴더에서만 이미지를 읽음.
+    폴더 내 이미지를 섞어서 제시.
     """
-    rater_index = int(rater_id.replace("R", "")) - 1
+    cfg = RATER_CONFIG[rater_id]
+    n_hq = cfg["n_hq"]
+    n_lq = cfg["n_lq"]
+
+    if len(hq_paths) != n_hq:
+        raise RuntimeError(
+            b(
+                f"{rater_id}의 HQ 폴더에는 정확히 {n_hq}장이 있어야 합니다. 현재 {len(hq_paths)}장입니다.",
+                f"{rater_id} HQ folder must contain exactly {n_hq} images. Found {len(hq_paths)}."
+            )
+        )
+
+    if len(lq_paths) != n_lq:
+        raise RuntimeError(
+            b(
+                f"{rater_id}의 LQ 폴더에는 정확히 {n_lq}장이 있어야 합니다. 현재 {len(lq_paths)}장입니다.",
+                f"{rater_id} LQ folder must contain exactly {n_lq} images. Found {len(lq_paths)}."
+            )
+        )
+
     rng = random.Random(f"{STUDY_ID}_{APP_VERSION}_{rater_id}")
 
-    hq_partition = hq_paths[rater_index::NUM_RATERS]
-    lq_partition = lq_paths[rater_index::NUM_RATERS]
-
-    if len(hq_partition) < N_HQ_PER_RATER or len(lq_partition) < N_LQ_PER_RATER:
-        raise RuntimeError(b("이미지 수가 부족합니다. 폴더/이미지 수를 확인하세요.",
-                             "Not enough images. Please check folders/image counts."))
-
-    anchors = []
-    if ENABLE_ANCHOR_SET:
-        anchor_rng = random.Random(f"{STUDY_ID}_{APP_VERSION}_ANCHOR")
-        hq_anchor = anchor_rng.sample(hq_paths, ANCHOR_HQ)
-        lq_anchor = anchor_rng.sample(lq_paths, ANCHOR_LQ)
-        anchor_ids = set([make_image_id(p) for p in (hq_anchor + lq_anchor)])
-        for p in hq_anchor:
-            anchors.append({"path": p, "source_quality": "HQ"})
-        for p in lq_anchor:
-            anchors.append({"path": p, "source_quality": "LQ"})
-    else:
-        anchor_ids = set()
-
-    hq_partition_filtered = [p for p in hq_partition if make_image_id(p) not in anchor_ids]
-    lq_partition_filtered = [p for p in lq_partition if make_image_id(p) not in anchor_ids]
-
-    n_hq_unique = N_HQ_PER_RATER
-    n_lq_unique = N_LQ_PER_RATER
-    if ENABLE_ANCHOR_SET:
-        n_hq_unique = max(0, N_HQ_PER_RATER - ANCHOR_HQ)
-        n_lq_unique = max(0, N_LQ_PER_RATER - ANCHOR_LQ)
-
-    hq_selected = rng.sample(hq_partition_filtered, n_hq_unique)
-    lq_selected = rng.sample(lq_partition_filtered, n_lq_unique)
-
     cases = []
-    for c in anchors:
-        cases.append(c)
-
-    for p in hq_selected:
+    for p in sorted(hq_paths):
         cases.append({"path": p, "source_quality": "HQ"})
-    for p in lq_selected:
+    for p in sorted(lq_paths):
         cases.append({"path": p, "source_quality": "LQ"})
 
     rng.shuffle(cases)
@@ -257,9 +268,6 @@ def build_case_list_for_rater(hq_paths, lq_paths, rater_id: str):
 # UI Helpers
 # =========================================================
 def artifact_radio(label_title_ko, label_title_en, description_ko, description_en, key_prefix, example_key=None):
-    """
-    Collect O/X/N/A per artifact item.
-    """
     try:
         q_col, img_col = st.columns([7, 3], vertical_alignment="top")
     except TypeError:
@@ -299,29 +307,52 @@ def artifact_radio(label_title_ko, label_title_en, description_ko, description_e
 # =========================================================
 def main():
     st.title("🧪 " + b("합성 CXR 품질 평가(QA) 설문", "Synthetic CXR Quality Assessment (QA) Survey"))
-    st.caption(b("본 설문은 진단(CADx)이 아니라 합성데이터의 공유/학습 적합성(QA)을 평가하기 위한 것입니다.",
-                 "This survey is NOT for diagnosis (CADx). It evaluates the suitability of synthetic data for sharing/training (QA)."))
+    st.caption(
+        b(
+            "본 설문은 진단(CADx)이 아니라 합성데이터의 공유/학습 적합성(QA)을 평가하기 위한 것입니다.",
+            "This survey is NOT for diagnosis (CADx). It evaluates the suitability of synthetic data for sharing/training (QA)."
+        )
+    )
 
-    # --- Sidebar: rater select + consent ---
+    # Sidebar
     st.sidebar.header(b("참여자 설정", "Participant Setup"))
     rater_id = st.sidebar.selectbox(b("평가자 코드", "Rater ID"), options=RATER_OPTIONS, index=0)
 
     if rater_id == b("선택", "Select"):
-        st.info(b("왼쪽 사이드바에서 평가자 코드를 선택해주세요.",
-                  "Please select your rater ID from the left sidebar."))
+        st.info(
+            b(
+                "왼쪽 사이드바에서 평가자 코드를 선택해주세요.",
+                "Please select your rater ID from the left sidebar."
+            )
+        )
         st.stop()
 
-    # ✅ FIX 1: Detect rater change & reset per-rater session state
+    if rater_id not in RATER_CONFIG:
+        st.error(b("잘못된 평가자 코드입니다.", "Invalid rater ID."))
+        st.stop()
+
+    # rater 변경 시 state 초기화
     if st.session_state.get("active_rater_id") != rater_id:
         st.session_state["active_rater_id"] = rater_id
         st.session_state["timer_case_idx"] = None
         st.session_state["case_start_time"] = time.time()
+        st.session_state["current_index"] = 0
 
     consent = st.sidebar.checkbox(b("연구 안내를 읽었습니다.", "I have read the study information."))
     if not consent:
-        st.warning(b("설문을 진행하려면 동의 체크가 필요합니다.",
-                     "You must check consent to proceed."))
+        st.warning(
+            b(
+                "설문을 진행하려면 동의 체크가 필요합니다.",
+                "You must check consent to proceed."
+            )
+        )
         st.stop()
+
+    cfg = RATER_CONFIG[rater_id]
+    st.sidebar.divider()
+    st.sidebar.markdown("**" + b("평가자 정보", "Rater Info") + "**")
+    st.sidebar.caption(f"{rater_id} / {cfg['display_name']}")
+    st.sidebar.caption(f"HQ: {cfg['n_hq']} / LQ: {cfg['n_lq']}")
 
     st.sidebar.divider()
     st.sidebar.markdown("**" + b("평가 원칙", "Rating Principles") + "**")
@@ -331,19 +362,26 @@ def main():
     st.sidebar.markdown("- " + b("이미지 출처(HQ/LQ)는 표시되지 않습니다(블라인드).",
                                  "The source (HQ/LQ) is hidden (blinded)."))
 
-    # Load images
-    for folder in HQ_FOLDERS + LQ_FOLDERS + [EXAMPLE_IMAGES_DIR]:
+    # Load only this rater's folders
+    hq_folders = cfg["hq_folders"]
+    lq_folders = cfg["lq_folders"]
+
+    for folder in hq_folders + lq_folders + [EXAMPLE_IMAGES_DIR]:
         os.makedirs(folder, exist_ok=True)
 
-    hq_paths = load_image_paths(HQ_FOLDERS)
-    lq_paths = load_image_paths(LQ_FOLDERS)
+    hq_paths = load_image_paths(hq_folders)
+    lq_paths = load_image_paths(lq_folders)
 
-    if len(hq_paths) == 0 or len(lq_paths) == 0:
-        st.error(b("HQ/LQ 폴더에 이미지가 없습니다. 폴더 경로 및 파일을 확인해주세요.",
-                   "No images found in HQ/LQ folders. Please check folder paths/files."))
+    if len(hq_paths) == 0 and len(lq_paths) == 0:
+        st.error(
+            b(
+                "지정된 평가자 폴더에 이미지가 없습니다. 폴더 경로를 확인해주세요.",
+                "No images were found in the assigned rater folders. Please check the folder paths."
+            )
+        )
         st.stop()
 
-    # Build assignment
+    # Case assignment
     try:
         assigned_cases = build_case_list_for_rater(hq_paths, lq_paths, rater_id)
     except Exception as e:
@@ -368,13 +406,16 @@ def main():
             start_index = i
             break
 
-    # ✅ FIX 2: Always set current_index to start_index (computed per rater from sheet)
     st.session_state["current_index"] = start_index
 
     # Done?
     if st.session_state["current_index"] >= total_cases:
-        st.success(b("🎉 모든 배정 케이스 평가가 완료되었습니다. 감사합니다!",
-                     "🎉 You have completed all assigned cases. Thank you!"))
+        st.success(
+            b(
+                "🎉 모든 배정 케이스 평가가 완료되었습니다. 감사합니다!",
+                "🎉 You have completed all assigned cases. Thank you!"
+            )
+        )
         st.balloons()
         return
 
@@ -385,10 +426,10 @@ def main():
     image_id = make_image_id(image_path)
     case_hash = hash_case(image_id)
 
-    # Timer init per case
+    # Timer init
     if st.session_state.get("timer_case_idx") != current_idx:
-        st.session_state.timer_case_idx = current_idx
-        st.session_state.case_start_time = time.time()
+        st.session_state["timer_case_idx"] = current_idx
+        st.session_state["case_start_time"] = time.time()
 
     # Progress UI
     st.progress(current_idx / total_cases)
@@ -539,7 +580,6 @@ def main():
                     use_container_width=True
                 )
 
-        # Save logic (outside form)
         if submit:
             errors = []
             if quality_score == b("선택", "Select"):
@@ -561,7 +601,7 @@ def main():
             else:
                 elapsed = max(0.0, time.time() - st.session_state.get("case_start_time", time.time()))
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                source_quality = case["source_quality"]  # hidden label
+                source_quality = case["source_quality"]
 
                 row = [
                     timestamp,
@@ -590,7 +630,6 @@ def main():
                     try:
                         sheet.append_row(row)
                         st.toast(b("✅ 저장 완료", "✅ Saved") + f" (Case {current_idx + 1}/{total_cases})")
-                        # current_index will be recomputed from sheet on rerun
                         st.rerun()
                     except Exception as e:
                         st.error(b("구글 시트 저장 중 오류", "Error while saving to Google Sheet") + f": {e}")
@@ -603,4 +642,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
