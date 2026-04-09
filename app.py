@@ -23,7 +23,7 @@ APP_VERSION = "M2SMF_QA_SURVEY_v2.3_YANG_CROSS"
 STUDY_ID = "M2SMF_Synthetic_CXR_QA_Yang_CrossEval"
 
 RATER_CONFIG = {
-    "R4_cross": {
+    "cross": {
         "display_name": "Cross-evaluation 60",
         "worksheet_name": "R4_cross",
         "manifest_paths": [
