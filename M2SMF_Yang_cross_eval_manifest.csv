@@ -1,0 +1,67 @@
+﻿blind_case_order,image_id,original_rater,final_bucket,selection_note,source_quality_hidden,score,release,case_order,artifact_count,other_yes,comment
+1,roentgen_10_440/demo1453_0.jpg,R1,clear_LQ,target_clear_LQ,LQ,2,No,49,3,Yes,Pacemaker catheter 음영 경계가 불분명하고 distal end 가 명확하지 않음
+2,Song/LQ/demo0486_0.jpg,R3,boundary,target_boundary_score3,LQ,3,No,1,3,Yes,vertebra pedicle들이 잘 안 보임.
+3,Lee/HQ/demo1959_0.jpg,R2,hq_like,HQ_fallback_rule_discordant,HQ,4,No,5,1,No,
+4,Song/HQ/demo1767_0.jpg,R3,boundary,target_boundary_score3,HQ,3,No,40,2,No,
+5,roentgen_10_440/demo0362_0.jpg,R1,boundary,target_boundary_score3,LQ,3,Yes,7,3,Yes,좌측 하폐야 늑골의 고음영이 대비도가 너무 높음. old rib fracture 는 이렇게 고음영의 대비도가 높게 보이지 않음.
+6,Lee/HQ/demo1788_0.jpg,R2,hq_like,HQ_fallback_score3_hiddenHQ,HQ,3,No,36,2,No,
+7,roentgen_10_440/demo1563_0.jpg,R1,clear_LQ,target_clear_LQ,LQ,2,No,35,2,Yes,양측 하부복벽 음영이 부분적으로 저음영으로 보이는 부위가 부자연스러움.
+8,Lee/HQ/demo1046_0.jpg,R2,clear_LQ,target_clear_LQ,HQ,2,No,12,3,Yes,Scapula와 rib의 모양이 이상함.
+9,Song/HQ/demo1175_0.jpg,R3,hq_like,target_HQ_candidate,HQ,4,Yes,5,0,Yes,질감이 약간 plastic 함.
+10,Song/HQ/demo0686_0.jpg,R3,hq_like,target_HQ_candidate,HQ,4,Yes,10,2,No,
+11,Lee/HQ/demo0392_0.jpg,R2,boundary,target_boundary_score3,HQ,3,No,32,2,No,
+12,roentgen_10_440/demo1284_0.jpg,R1,clear_LQ,target_clear_LQ,LQ,1,No,28,4,Yes,좌측 유방 바깥쪽 curvilinear opacity 가 부자연스러움. 상부흉추 음영이 과도하게 높으며 주변 저음영이 과도한 대비를 보이고 있음.
+13,roentgen_10_440/demo0977_0.jpg,R1,boundary,target_boundary_score3,LQ,3,No,31,2,Yes,흉벽 공기음영의 대조도가 과함.
+14,Song/HQ/demo1729_0.jpg,R3,boundary,target_boundary_score3,HQ,3,No,50,2,No,
+15,Lee/LQ/demo1471_0.jpg,R2,boundary,target_boundary_score3,LQ,3,No,1,2,No,
+16,roentgen_10_440/demo0914_0.jpg,R1,clear_LQ,target_clear_LQ,LQ,2,No,27,2,Yes,흉벽의 과도한 공기 음영가 대조도가 인공적으로 보임. 심장 후방 늑골 음영이 과도하게 고음영으로 보임.
+17,Lee/HQ/demo0379_0.jpg,R2,hq_like,HQ_fallback_score3_hiddenHQ,HQ,3,No,4,2,No,
+18,Song/HQ/demo1298_0.jpg,R3,hq_like,target_HQ_candidate,HQ,4,Yes,2,1,No,
+19,Lee/LQ/demo1623_0.jpg,R2,clear_LQ,target_clear_LQ,LQ,2,No,19,2,Yes,scapula 모양이상.
+20,Song/HQ/demo1991_0.jpg,R3,clear_LQ,target_clear_LQ,HQ,2,No,11,5,Yes,"Breast shadow와 팔에 skin 윤곽이 부자연스러움.
+vertebra 모양이 부자연스럽고 rib 이 하나의 thoracic vertera와 매칭되지 않음."
+21,roentgen_10_440/demo1949_0.jpg,R1,boundary,target_boundary_score3,LQ,3,Yes,10,2,Yes,obesity 로 인해 투과도가 전반적으로 낮아 해상도가 낮을 것으로 기대되는 body shape 임에도 폐음영 대조도가 높아서 부자연스럽게 느껴짐.
+22,roentgen_10_440/demo0529_0.jpg,R1,boundary,target_boundary_score3,LQ,3,No,34,2,Yes,우측 중간폐야 외부 부착물 음영 주위 저음영이 과도함.
+23,Song/HQ/demo0224_0.jpg,R3,boundary,target_boundary_score3,HQ,3,No,9,1,No,
+24,Lee/HQ/demo0049_0.jpg,R2,boundary,target_boundary_score3,HQ,3,No,29,1,Yes,T spine 모양이 이상함.
+25,roentgen_75_440/demo1042_0.jpg,R1,hq_like,target_HQ_candidate,HQ,4,Yes,17,1,No,
+26,Song/LQ/demo0532_0.jpg,R3,clear_LQ,target_clear_LQ,LQ,2,No,47,4,Yes,"인공물 모양이 cartoonistic 함.
+전체적인 질감이 어색함."
+27,Lee/HQ/demo1957_0.jpg,R2,hq_like,HQ_fallback_rule_discordant,HQ,4,No,3,3,No,
+28,Song/HQ/demo1972_0.jpg,R3,hq_like,target_HQ_candidate,HQ,4,Yes,48,1,No,
+29,roentgen_10_440/demo0141_0.jpg,R1,boundary,target_boundary_score3,LQ,3,Yes,18,2,No,
+30,Lee/HQ/demo1345_0.jpg,R2,hq_like,target_HQ_candidate,HQ,4,Yes,16,1,No,
+31,Lee/LQ/demo0149_0.jpg,R2,boundary,target_boundary_score3,LQ,3,No,31,2,No,
+32,Song/HQ/demo0150_0.jpg,R3,boundary,target_boundary_score3,HQ,3,No,42,1,No,
+33,roentgen_75_440/demo0812_0.jpg,R1,boundary,target_boundary_score3,HQ,3,No,39,3,No,
+34,roentgen_75_440/demo0189_0.jpg,R1,hq_like,target_HQ_candidate,HQ,4,Yes,24,1,No,
+35,Lee/LQ/demo1902_0.jpg,R2,clear_LQ,target_clear_LQ,LQ,1,No,7,7,Yes,정상적인 구조물이 없음.
+36,Song/LQ/demo1846_0.jpg,R3,clear_LQ,target_clear_LQ,LQ,1,No,17,6,Yes,"목에 soft tissue 부피나 골격 대비 soft tissue 의 양이 너무 부자연스러움.
+vertebra 모양이 전반적으로 이상함."
+37,Lee/LQ/demo0661_0.jpg,R2,clear_LQ,target_clear_LQ,LQ,1,No,30,7,No,
+38,roentgen_10_440/demo0353_0.jpg,R1,hq_like,target_HQ_candidate,LQ,4,Yes,21,1,No,
+39,Song/HQ/demo1500_0.jpg,R3,clear_LQ,target_clear_LQ,HQ,1,No,15,4,Yes,"vertebra 모양이 전반적으로 어색함.
+양측 scapula 윤곽도 그리다 만 것 같은 모양으로 부자연스러움."
+40,Lee/HQ/demo0227_0.jpg,R2,clear_LQ,target_clear_LQ,HQ,1,No,50,4,No,thoracic cavity 모양 자체가 이상함.
+41,Song/HQ/demo1400_0.jpg,R3,boundary,target_boundary_score3,HQ,3,No,32,2,No,
+42,roentgen_10_440/demo1737_0.jpg,R1,clear_LQ,target_clear_LQ,LQ,2,No,22,2,Yes,양측 견갑골 하부 경계 불분명함.
+43,Song/HQ/demo0984_0.jpg,R3,hq_like,target_HQ_candidate,HQ,4,Yes,39,1,No,
+44,roentgen_75_440/demo0945_0.jpg,R1,hq_like,target_HQ_candidate,HQ,5,Yes,3,0,No,
+45,Lee/HQ/demo1302_0.jpg,R2,boundary,target_boundary_score3,HQ,3,No,9,1,No,
+46,roentgen_75_440/demo1909_0.jpg,R1,boundary,target_boundary_score3,HQ,3,No,12,1,No,
+47,Song/HQ/demo0762_0.jpg,R3,hq_like,HQ_fallback_score3_hiddenHQ,HQ,3,No,6,1,No,
+48,Lee/LQ/demo0953_0.jpg,R2,boundary,target_boundary_score3,LQ,3,No,21,2,No,
+49,Lee/HQ/demo0228_0.jpg,R2,boundary,target_boundary_score3,HQ,3,No,13,0,No,
+50,roentgen_75_440/demo0132_0.jpg,R1,hq_like,target_HQ_candidate,HQ,5,Yes,33,0,No,
+51,Song/HQ/demo0458_0.jpg,R3,boundary,target_boundary_score3,HQ,3,No,37,2,No,
+52,Lee/LQ/demo0837_0.jpg,R2,boundary,target_boundary_score3,LQ,3,No,15,2,No,
+53,Song/HQ/demo0659_0.jpg,R3,boundary,target_boundary_score3,HQ,3,No,4,2,No,
+54,roentgen_75_440/demo0404_0.jpg,R1,clear_LQ,target_clear_LQ,HQ,2,No,47,1,Yes,우측 폐야 대부분이 커버되지 않아 영상 데이터로서 가치가 없음.
+55,roentgen_75_440/demo1996_0.jpg,R1,hq_like,target_HQ_candidate,HQ,5,Yes,13,0,No,
+56,Lee/HQ/demo1745_0.jpg,R2,hq_like,target_HQ_candidate,HQ,4,Yes,47,1,No,
+57,Song/LQ/demo1358_0.jpg,R3,clear_LQ,target_clear_LQ,LQ,1,No,22,7,Yes,"모든 뼈 모양이 다 이상함.
+왼쪽 위쪽 시야 (환자의 오른쪽 위쪽)에 보이는 구조물이 비현실적인 구조물임 (오른팔?)
+왼쪽 팔 뼈가 없음"
+58,Lee/HQ/demo0217_0.jpg,R2,clear_LQ,target_clear_LQ,HQ,1,No,25,4,Yes,spine의 모양이 전반적으로 이상함.
+59,roentgen_10_440/demo0893_0.jpg,R1,boundary,target_boundary_score3,LQ,3,No,29,1,No,
+60,Song/HQ/demo0298_0.jpg,R3,clear_LQ,target_clear_LQ,HQ,1,No,27,2,Yes,Rt paraspinal line을 따라서 직사각형의 인공물 음영이 보이고 부자연스러움.
