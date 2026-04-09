@@ -24,7 +24,7 @@ STUDY_ID = "M2SMF_Synthetic_CXR_QA_Yang_CrossEval"
 
 RATER_CONFIG = {
     "R4_cross": {
-        "display_name": "Yang (Cross-evaluation 60)",
+        "display_name": "Cross-evaluation 60",
         "worksheet_name": "R4_cross",
         "manifest_paths": [
             "M2SMF_Yang_cross_eval_manifest.csv",
@@ -41,7 +41,7 @@ IMAGE_ROOT_CANDIDATES = [".", "/mnt/data"]
 
 # Streamlit page
 st.set_page_config(
-    page_title=b("Yang 교수님 교차평가 설문", "Yang Cross-evaluation Survey"),
+    page_title=b("교차평가 설문", "Cross-evaluation Survey"),
     layout="wide"
 )
 
@@ -317,7 +317,7 @@ def artifact_radio(label_title_ko, label_title_en, description_ko, description_e
 # Main
 # =========================================================
 def main():
-    st.title("🧪 " + b("Yang 교수님 교차평가 설문", "Yang Cross-evaluation Survey"))
+    st.title("🧪 " + b("교차평가 설문", "Cross-evaluation Survey"))
     st.caption(
         b(
             "본 설문은 기존 seed label의 신뢰도를 확인하기 위한 블라인드 교차평가입니다. 이미지 출처, 원 평가자, 원 점수는 표시되지 않습니다.",
@@ -367,14 +367,14 @@ def main():
         st.stop()
 
     total_cases = len(assigned_cases)
-    st.sidebar.success(b("케이스 목록 로딩 완료", "Case manifest loaded") + f": {os.path.basename(manifest_path)}")
+    # st.sidebar.success(b("케이스 목록 로딩 완료", "Case manifest loaded") + f": {os.path.basename(manifest_path)}")
     st.sidebar.caption(b("총 케이스 수", "Total cases") + f": {total_cases}")
 
     # Google Sheet
     sheet = get_google_sheet(rater_id)
     if sheet:
         ensure_sheet_header(sheet)
-        st.sidebar.success(b("Google Sheet 연결됨", "Connected to Google Sheet") + f": {sheet.spreadsheet.title} / {sheet.title}")
+        # st.sidebar.success(b("Google Sheet 연결됨", "Connected to Google Sheet") + f": {sheet.spreadsheet.title} / {sheet.title}")
 
     processed_ids = load_processed_image_ids(sheet, rater_id)
 
