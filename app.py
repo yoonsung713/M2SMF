@@ -24,7 +24,7 @@ STUDY_ID = "M2SMF_Synthetic_CXR_QA_Yang_CrossEval"
 
 RATER_CONFIG = {
     "cross": {
-        "display_name": "Cross-evaluation 60",
+        "display_name": "validation",
         "worksheet_name": "R4_cross",
         "manifest_paths": [
             "M2SMF_Yang_cross_eval_manifest.csv",
