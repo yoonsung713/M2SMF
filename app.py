@@ -223,34 +223,59 @@ def append_local_result(reader_id: str, row: list):
 
 
 def load_processed_assignment_ids(sheet, reader_id: str):
+    """
+    Google Sheet에 이미 저장된 assignment_id만 읽어서 resume 위치를 결정한다.
+    local CSV는 사용하지 않는다.
+
+    동작:
+      - Sheet에 row가 있으면 해당 assignment_id는 완료 처리
+      - Sheet에 row가 없으면 processed=set() → 처음부터 시작
+    """
     processed = set()
-    # Google Sheet rows
-    if sheet:
-        try:
-            rows = sheet.get_all_values()
-            if len(rows) > 1:
-                header = rows[0]
-                idx_study = header.index("study_id") if "study_id" in header else 1
-                idx_reader = header.index("reader_id") if "reader_id" in header else 3
-                idx_assignment = header.index("assignment_id") if "assignment_id" in header else 4
-                for row in rows[1:]:
-                    if len(row) <= max(idx_study, idx_reader, idx_assignment):
-                        continue
-                    if row[idx_study] == STUDY_ID and row[idx_reader] == reader_id:
-                        processed.add(row[idx_assignment])
-        except Exception:
-            pass
-    # Local fallback rows
-    path = local_result_path(reader_id)
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8-sig", newline="") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row.get("study_id") == STUDY_ID and row.get("reader_id") == reader_id:
-                        processed.add(row.get("assignment_id", ""))
-        except Exception:
-            pass
+
+    if sheet is None:
+        return processed
+
+    try:
+        rows = sheet.get_all_values()
+        if len(rows) <= 1:
+            return processed
+
+        header = rows[0]
+
+        required = ["study_id", "reader_id", "assignment_id"]
+        missing = [c for c in required if c not in header]
+        if missing:
+            st.error(
+                "Google Sheet header에 필요한 column이 없습니다: "
+                + ", ".join(missing)
+                + ". 기존 worksheet를 비우거나 새 worksheet를 사용해주세요."
+            )
+            st.stop()
+
+        idx_study = header.index("study_id")
+        idx_reader = header.index("reader_id")
+        idx_assignment = header.index("assignment_id")
+
+        for row in rows[1:]:
+            if len(row) <= max(idx_study, idx_reader, idx_assignment):
+                continue
+
+            study_id = row[idx_study].strip()
+            saved_reader_id = row[idx_reader].strip()
+            assignment_id = row[idx_assignment].strip()
+
+            if (
+                study_id == STUDY_ID
+                and saved_reader_id == reader_id
+                and assignment_id
+            ):
+                processed.add(assignment_id)
+
+    except Exception as e:
+        st.error(f"Google Sheet에서 진행 상태를 읽는 중 오류가 발생했습니다: {e}")
+        st.stop()
+
     return processed
 
 # =========================================================
