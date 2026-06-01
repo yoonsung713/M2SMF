@@ -158,7 +158,7 @@ def get_google_sheet(reader_id: str):
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sh = client.open(SHEET_NAME)
-        worksheet_name = READER_CONFIG[reader_id]["worksheet_name"]
+        worksheet_name = [reader_id]["worksheet_name"]
         try:
             ws = sh.worksheet(worksheet_name)
         except gspread.exceptions.WorksheetNotFound:
@@ -338,7 +338,7 @@ def main():
         b("평가자 코드", "Reader ID"),
         options=READER_OPTIONS,
         index=0,
-        format_func=lambda x: f"{x} - {READER_CONFIG[x]['display_name']}",
+        format_func=lambda x: f"{READER_CONFIG[x]['display_name']}",
     )
 
     if st.session_state.get("active_reader_id") != reader_id:
