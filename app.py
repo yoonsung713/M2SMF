@@ -3,7 +3,6 @@ import os
 import time
 import hashlib
 import csv
-from pathlib import Path
 from datetime import datetime
 from PIL import Image
 
@@ -23,9 +22,11 @@ def b(ko: str, en: str) -> str:
 # =========================================================
 # Study / App Config
 # =========================================================
-APP_VERSION = "M2SMF_EXTERNAL_SYNTH_QA_v1.0"
-STUDY_ID = "M2SMF_External_Synthetic_CXR_QA_300"
-SHEET_NAME = "M2SMF_external_synth_QA_survey"
+APP_VERSION = "M2SMF_EXTERNAL_SYNTH_ARTIFACT_ONLY_v1.1"
+STUDY_ID = "M2SMF_External_Synthetic_CXR_Artifact_Checklist_300"
+
+# 새 artifact-only 설문은 기존 full-QA 설문과 header가 다르므로 새 Sheet 사용 권장.
+SHEET_NAME = "M2SMF_external_synth_artifact_survey"
 
 READER_CONFIG = {
     "professor_1": {"display_name": "Professor 1", "worksheet_name": "Professor_1"},
@@ -45,8 +46,78 @@ ASSIGNMENT_PATH_CANDIDATES = [
 IMAGE_ROOT_CANDIDATES = [".", "./images", "/mnt/data"]
 LOCAL_RESULT_DIR = "local_survey_results"
 
-# Reader-facing sheet intentionally does not include generator/prompt/disease/age/sex.
-SHEET_HEADERS = [
+# NOTE:
+# 이 앱은 artifact checklist만 받습니다.
+# quality score, release, clinical issue, downstream confusion risk, comment는 받지 않습니다.
+# 저장값은 분석이 쉽도록 bilingual label이 아니라 X / O / N/A로 normalize합니다.
+ARTIFACTS = [
+    {
+        "key": "marker",
+        "sheet_col": "artifact_marker_OXN",
+        "ko": "1) 위치 마커/문자/라벨 이상",
+        "en": "1) Marker/text/label artifact",
+        "desc_ko": "L/R 마커, 문자, 병원 로고, 표시선, 비현실적 텍스트 또는 라벨이 보임",
+        "desc_en": "Visible L/R marker, text, logo, line, non-radiographic label, or unrealistic typography",
+    },
+    {
+        "key": "density",
+        "sheet_col": "artifact_density_OXN",
+        "ko": "2) 비현실적 투과도/밀도 artifact",
+        "en": "2) Unrealistic density/penetration artifact",
+        "desc_ko": "병변처럼 보일 수 있는 비현실적 음영, 얼룩, 과도한 smoothing, 물리적으로 어색한 density",
+        "desc_en": "Unrealistic opacity, blotch, over-smoothing, or physically implausible density that could mimic pathology",
+    },
+    {
+        "key": "gas_lucency",
+        "sheet_col": "artifact_gas_lucency_OXN",
+        "ko": "3) 비현실적 gas/lucency pattern",
+        "en": "3) Unrealistic gas/lucency pattern",
+        "desc_ko": "상복부/하부 흉부의 gas, lucency, diaphragm 아래 음영이 해부학적으로 부자연스러움",
+        "desc_en": "Unrealistic gas/lucency around the lower chest/upper abdomen or below the diaphragm",
+    },
+    {
+        "key": "boundaries",
+        "sheet_col": "artifact_boundaries_OXN",
+        "ko": "4) 해부학적 경계 불명확/붕괴",
+        "en": "4) Vague or collapsed anatomical boundaries",
+        "desc_ko": "심장, 종격동, 횡격막, 폐야, 피부/연조직 경계가 흐리거나 구조적으로 붕괴",
+        "desc_en": "Blurred or collapsed borders of heart, mediastinum, diaphragm, lungs, skin/soft tissue",
+    },
+    {
+        "key": "anterior_ribs",
+        "sheet_col": "artifact_anterior_ribs_OXN",
+        "ko": "5) 전방 늑골 소실/끊김/왜곡",
+        "en": "5) Missing/broken/distorted anterior ribs",
+        "desc_ko": "전방 늑골이 비현실적으로 사라지거나 끊기거나, 늑골 구조가 병변처럼 왜곡됨",
+        "desc_en": "Anterior ribs disappear, break, or distort unrealistically and may mimic or obscure disease",
+    },
+    {
+        "key": "wavy_clavicle",
+        "sheet_col": "artifact_wavy_clavicle_OXN",
+        "ko": "6) 쇄골 형태 이상",
+        "en": "6) Wavy or abnormal clavicle",
+        "desc_ko": "쇄골 윤곽이 물결 모양, 울퉁불퉁, 비대칭으로 부자연스러움. 단독으로는 low-quality 결정 근거가 아닐 수 있음",
+        "desc_en": "Clavicle contour is wavy, bumpy, or asymmetric. This alone may not define low quality",
+    },
+    {
+        "key": "organ_shape",
+        "sheet_col": "artifact_organ_shape_OXN",
+        "ko": "7) 장기/심장/종격동/횡격막 형태 이상",
+        "en": "7) Abnormal organ, cardiac, mediastinal, or diaphragm shape",
+        "desc_ko": "심장, 종격동, 횡격막, 폐야 형태가 해부학적으로 불가능하거나 비현실적",
+        "desc_en": "Heart, mediastinum, diaphragm, or lung contour is anatomically impossible or unrealistic",
+    },
+    {
+        "key": "global_quality_fov_crop",
+        "sheet_col": "artifact_global_quality_fov_crop_OXN",
+        "ko": "8) 전반적 non-diagnostic 품질/FOV/crop 문제",
+        "en": "8) Global non-diagnostic quality, FOV, or crop problem",
+        "desc_ko": "폐야/흉곽이 잘리거나, PA CXR로 보기 어렵거나, 전반적 품질 때문에 연구/AI 학습에 부적절",
+        "desc_en": "Lung/chest is cropped, image is not a usable PA CXR, or global quality is unsuitable for research/AI training",
+    },
+]
+
+BASE_HEADERS = [
     "timestamp",
     "study_id",
     "app_version",
@@ -56,100 +127,19 @@ SHEET_HEADERS = [
     "blinded_image_id",
     "blinded_filename",
     "case_hash",
-    "is_frontal_cxr_like_yesno",
-    "quality_score_1to5",
-    "release_recommend_yesno",
-    "clinical_issue_yesno",
-    "downstream_ai_confusion_risk_yesno",
-    "artifact_marker_OXN",
-    "artifact_density_OXN",
-    "artifact_gas_lucency_OXN",
-    "artifact_boundaries_OXN",
-    "artifact_anterior_ribs_OXN",
-    "artifact_wavy_clavicle_OXN",
-    "artifact_organ_shape_OXN",
-    "artifact_global_quality_fov_crop_OXN",
-    "other_flag_yesno",
-    "main_rejection_reason",
-    "comment",
-    "time_spent_sec",
 ]
+ARTIFACT_HEADERS = [a["sheet_col"] for a in ARTIFACTS]
+SHEET_HEADERS = BASE_HEADERS + ARTIFACT_HEADERS + ["time_spent_sec"]
 
-ARTIFACTS = [
-    {
-        "key": "marker",
-        "ko": "1) 위치 마커/문자/라벨 이상",
-        "en": "1) Marker/text/label artifact",
-        "desc_ko": "L/R 마커, 문자, 병원 로고, 표시선, 비현실적 텍스트 또는 라벨이 보임",
-        "desc_en": "Visible L/R marker, text, logo, line, non-radiographic label, or unrealistic typography",
-    },
-    {
-        "key": "density",
-        "ko": "2) 비현실적 투과도/밀도 artifact",
-        "en": "2) Unrealistic density/penetration artifact",
-        "desc_ko": "병변처럼 보일 수 있는 비현실적 음영, 얼룩, 과도한 smoothing, 물리적으로 어색한 density",
-        "desc_en": "Unrealistic opacity, blotch, over-smoothing, or physically implausible density that could mimic pathology",
-    },
-    {
-        "key": "gas_lucency",
-        "ko": "3) 비현실적 gas/lucency pattern",
-        "en": "3) Unrealistic gas/lucency pattern",
-        "desc_ko": "상복부/하부 흉부의 gas, lucency, diaphragm 아래 음영이 해부학적으로 부자연스러움",
-        "desc_en": "Unrealistic gas/lucency around the lower chest/upper abdomen or below the diaphragm",
-    },
-    {
-        "key": "boundaries",
-        "ko": "4) 해부학적 경계 불명확/붕괴",
-        "en": "4) Vague or collapsed anatomical boundaries",
-        "desc_ko": "심장, 종격동, 횡격막, 폐야, 피부/연조직 경계가 흐리거나 구조적으로 붕괴",
-        "desc_en": "Blurred or collapsed borders of heart, mediastinum, diaphragm, lungs, skin/soft tissue",
-    },
-    {
-        "key": "anterior_ribs",
-        "ko": "5) 전방 늑골 소실/끊김/왜곡",
-        "en": "5) Missing/broken/distorted anterior ribs",
-        "desc_ko": "전방 늑골이 비현실적으로 사라지거나 끊기거나, 늑골 구조가 병변처럼 왜곡됨",
-        "desc_en": "Anterior ribs disappear, break, or distort unrealistically and may mimic or obscure disease",
-    },
-    {
-        "key": "wavy_clavicle",
-        "ko": "6) 쇄골 형태 이상",
-        "en": "6) Wavy or abnormal clavicle",
-        "desc_ko": "쇄골 윤곽이 물결 모양, 울퉁불퉁, 비대칭으로 부자연스러움. 단독으로는 low-quality 결정 근거가 아닐 수 있음",
-        "desc_en": "Clavicle contour is wavy, bumpy, or asymmetric. This alone may not define low quality",
-    },
-    {
-        "key": "organ_shape",
-        "ko": "7) 장기/심장/종격동/횡격막 형태 이상",
-        "en": "7) Abnormal organ, cardiac, mediastinal, or diaphragm shape",
-        "desc_ko": "심장, 종격동, 횡격막, 폐야 형태가 해부학적으로 불가능하거나 비현실적",
-        "desc_en": "Heart, mediastinum, diaphragm, or lung contour is anatomically impossible or unrealistic",
-    },
-    {
-        "key": "global_quality_fov_crop",
-        "ko": "8) 전반적 non-diagnostic 품질/FOV/crop 문제",
-        "en": "8) Global non-diagnostic quality, FOV, or crop problem",
-        "desc_ko": "폐야/흉곽이 잘리거나, PA CXR로 보기 어렵거나, 전반적 품질 때문에 연구/AI 학습에 부적절",
-        "desc_en": "Lung/chest is cropped, image is not a usable PA CXR, or global quality is unsuitable for research/AI training",
-    },
-]
+CHOICE_LABEL_TO_VALUE = {
+    b("선택", "Select"): "",
+    b("X(없음)", "X(None)"): "X",
+    b("O(있음)", "O(Present)"): "O",
+    b("N/A(판단 불가)", "N/A(Unable to judge)"): "N/A",
+}
+CHOICE_LABELS = list(CHOICE_LABEL_TO_VALUE.keys())
 
-REJECTION_REASONS = [
-    "",
-    "No major issue / release acceptable",
-    "Non-CXR or not frontal PA CXR-like",
-    "Global FOV/crop/non-diagnostic quality problem",
-    "Unrealistic density/opacity that could mimic disease",
-    "Unrealistic gas/lucency or diaphragm/lower chest problem",
-    "Rib/bone anatomy distortion",
-    "Cardiac/mediastinal/diaphragm/organ shape distortion",
-    "Boundary collapse or blurred anatomy",
-    "Marker/text/label artifact only",
-    "Multiple artifacts",
-    "Other",
-]
-
-st.set_page_config(page_title=b("외부 합성 CXR QA 설문", "External Synthetic CXR QA Survey"), layout="wide")
+st.set_page_config(page_title=b("외부 합성 CXR artifact 설문", "External Synthetic CXR Artifact Survey"), layout="wide")
 
 # =========================================================
 # Google Sheets and local fallback
@@ -189,8 +179,8 @@ def ensure_sheet_header(sheet):
         elif values[0] != SHEET_HEADERS:
             st.warning(
                 b(
-                    "⚠️ Google Sheet 헤더가 현재 앱과 다릅니다. 새 워크시트 또는 새 시트를 권장합니다.",
-                    "⚠️ Google Sheet header differs from this app. A new worksheet/sheet is recommended.",
+                    "⚠️ Google Sheet 헤더가 현재 artifact-only 앱과 다릅니다. 새 worksheet 또는 새 sheet 사용을 권장합니다.",
+                    "⚠️ Google Sheet header differs from this artifact-only app. A new worksheet/sheet is recommended.",
                 )
             )
     except Exception as e:
@@ -300,6 +290,8 @@ def resolve_image_path(row: dict) -> str:
                     norm_rel = os.path.normpath(rel).replace("\\", "/")
                     if norm_rel and norm_candidate.endswith(norm_rel):
                         return candidate
+                    if not norm_rel:
+                        return candidate
     return row.get("image_path") or row.get("image_relpath")
 
 
@@ -319,32 +311,25 @@ def resize_image_pil(image_path, max_height=960):
 def artifact_radio(artifact: dict, case_key: str):
     st.markdown(f"**{b(artifact['ko'], artifact['en'])}**")
     st.caption(b(artifact["desc_ko"], artifact["desc_en"]))
-    return st.radio(
+    label = st.radio(
         b("선택", "Select"),
-        options=[
-            b("X(없음)", "X(None)"),
-            b("O(있음)", "O(Present)"),
-            b("N/A(판단 불가)", "N/A(Unable to judge)"),
-        ],
+        options=CHOICE_LABELS,
         index=0,
         horizontal=True,
         key=f"artifact_{artifact['key']}_{case_key}",
         label_visibility="collapsed",
     )
-
-
-def is_select_placeholder(value: str) -> bool:
-    return value == b("선택", "Select") or value == ""
+    return CHOICE_LABEL_TO_VALUE[label]
 
 # =========================================================
 # Main
 # =========================================================
 def main():
-    st.title("🩻 " + b("외부 합성 CXR 품질 보증 설문", "External Synthetic CXR Quality Assurance Survey"))
+    st.title("🩻 " + b("외부 합성 CXR Artifact Checklist 설문", "External Synthetic CXR Artifact Checklist Survey"))
     st.caption(
         b(
-            "본 설문은 Nano Banana, Sana, ChatGPT Images 2.0, RoentGen-v2로 생성된 합성 CXR를 실제 연구/AI 학습 데이터로 사용해도 되는지 평가하기 위한 블라인드 설문입니다.",
-            "This blinded survey evaluates whether synthetic CXRs generated by Nano Banana, Sana, ChatGPT Images 2.0, and RoentGen-v2 are suitable for research/AI training.",
+            "본 설문은 Nano Banana, Sana, ChatGPT Images 2.0, RoentGen-v2로 생성된 합성 CXR의 artifact 유무만 블라인드로 평가합니다.",
+            "This blinded survey records only artifact presence/absence in synthetic CXRs generated by Nano Banana, Sana, ChatGPT Images 2.0, and RoentGen-v2.",
         )
     )
 
@@ -370,9 +355,8 @@ def main():
     st.sidebar.divider()
     st.sidebar.markdown("**" + b("평가 원칙", "Rating Principles") + "**")
     st.sidebar.markdown("- " + b("generator, prompt, 병명, 나이, 성별은 블라인드 처리됩니다.", "Generator, prompt, disease, age, and sex are blinded."))
-    st.sidebar.markdown("- " + b("질병 진단 정확도를 평가하는 것이 아니라, 합성 이미지가 연구/AI 학습용으로 안전한지 평가합니다.", "This is not a diagnosis task; evaluate whether the synthetic image is safe for research/AI training."))
-    st.sidebar.markdown("- " + b("marker 단독은 임상적으로 중요한 low-quality 근거가 아닐 수 있습니다.", "Marker alone may not constitute clinically meaningful low quality."))
-    st.sidebar.markdown("- " + b("병변처럼 보일 수 있는 합성 artifact가 downstream AI를 혼동시킬 위험을 특히 기록해주세요.", "Please specifically note artifacts that could be confused with pathology by downstream AI."))
+    st.sidebar.markdown("- " + b("질병 진단 정확도나 release 여부가 아니라, 아래 artifact 유무만 평가합니다.", "Do not rate diagnosis accuracy or release suitability; only rate the artifact checklist below."))
+    st.sidebar.markdown("- " + b("각 항목은 반드시 X/O/N/A 중 하나를 선택해주세요.", "For each artifact, select exactly one of X/O/N/A."))
 
     try:
         all_rows, assignment_path = load_assignment()
@@ -451,83 +435,17 @@ def main():
         st.caption(b("화면에는 generator/prompt/병명/나이/성별이 표시되지 않습니다.", "Generator/prompt/disease/age/sex are intentionally not shown."))
 
     with col_right:
-        st.subheader("📝 " + b("평가 입력", "Rating Form"))
+        st.subheader("📝 " + b("Artifact checklist", "Artifact checklist"))
         qa_box = st.container(height=790, border=True)
         with qa_box:
             with st.form(key=f"form_{reader_id}_{assignment_id}"):
-                # st.markdown("##### " + b("1) 전반적 사용 가능성", "1) Overall usability"))
-
-                # with st.expander(b("품질 점수 기준 보기", "Show quality score criteria"), expanded=False):
-                #     st.markdown(
-                #         "- **1**: " + b("비진단적/심한 합성 artifact로 연구·AI 학습 데이터로 사용 부적절", "Non-diagnostic or severe synthetic artifact; unsuitable for research/AI training") + "\n"
-                #         "- **2**: " + b("명확한 합성 artifact가 있어 사용 위험", "Clear synthetic artifacts; risky to use") + "\n"
-                #         "- **3**: " + b("경계선. 일부는 자연스럽지만 artifact 또는 구조 불일치가 의심", "Borderline; partly natural but suspicious artifacts or structural inconsistency") + "\n"
-                #         "- **4**: " + b("대부분 자연스럽고 연구·AI 학습에 사용 가능해 보임", "Mostly natural and appears usable for research/AI training") + "\n"
-                #         "- **5**: " + b("실제 PA CXR와 구별이 어렵고 전반적으로 매우 자연스러움", "Very hard to distinguish from real PA CXR; highly natural overall")
-                #     )
-
-                # is_frontal = st.selectbox(
-                #     b("A) 이 이미지는 frontal PA CXR처럼 보입니까?", "A) Does this look like a frontal PA CXR?"),
-                #     options=[b("선택", "Select"), "Yes", "No", "Unclear"],
-                #     index=0,
-                #     key=f"frontal_{assignment_id}",
-                # )
-                # quality_score = st.selectbox(
-                #     b("B) 합성 CXR 품질 점수", "B) Synthetic CXR quality score"),
-                #     options=[b("선택", "Select"), "1", "2", "3", "4", "5"],
-                #     index=0,
-                #     key=f"quality_{assignment_id}",
-                # )
-                # release = st.selectbox(
-                #     b("C) 실제 연구/AI 학습 데이터로 사용 가능하다고 보십니까?", "C) Suitable for real research/AI training data?"),
-                #     options=[b("선택", "Select"), "Yes", "No"],
-                #     index=0,
-                #     key=f"release_{assignment_id}",
-                # )
-                # clinical_issue = st.selectbox(
-                #     b("D) 임상적으로 중요한 합성 artifact 또는 비진단적 품질 문제가 있습니까?", "D) Clinically meaningful synthetic artifact or non-diagnostic quality issue?"),
-                #     options=[b("선택", "Select"), "Yes", "No", "Unclear"],
-                #     index=0,
-                #     key=f"clinical_issue_{assignment_id}",
-                # )
-                # downstream_risk = st.selectbox(
-                #     b(
-                #         "E) downstream AI가 병변 표현과 합성 artifact를 혼동할 위험이 있다고 보십니까?",
-                #         "E) Risk that downstream AI could confuse synthetic artifact with pathology?",
-                #     ),
-                #     options=[b("선택", "Select"), "Yes", "No", "Unclear"],
-                #     index=0,
-                #     key=f"downstream_risk_{assignment_id}",
-                # )
-
-                st.markdown("---")
-                st.markdown("##### " + b("2) Artifact checklist", "2) Artifact checklist"))
-                st.caption(b("각 항목을 O/X/N/A로 평가해주세요.", "Rate each item as O/X/N/A."))
+                st.caption(b("각 artifact 항목에 대해 X/O/N/A만 선택해주세요.", "For each artifact, select X/O/N/A only."))
                 artifact_values = {}
                 for art in ARTIFACTS:
                     artifact_values[art["key"]] = artifact_radio(art, assignment_id)
                     st.markdown("")
 
                 st.markdown("---")
-                # st.markdown("##### " + b("3) 주요 사유와 코멘트", "3) Main reason and comment"))
-                # other_flag = st.selectbox(
-                #     b("기타 부자연스러움이 있습니까?", "Any other unnatural finding?"),
-                #     options=[b("선택", "Select"), "Yes", "No"],
-                #     index=0,
-                #     key=f"other_{assignment_id}",
-                # )
-                # main_reason = st.selectbox(
-                #     b("주요 reject/review 사유", "Main reject/review reason"),
-                #     options=REJECTION_REASONS,
-                #     index=0,
-                #     key=f"reason_{assignment_id}",
-                # )
-                # comment = st.text_area(
-                #     b("코멘트 — 부자연스러운 부위/이유를 짧게 기록", "Comment — brief location/reason"),
-                #     height=90,
-                #     placeholder=b("예: 우측 하폐야 음영이 병변처럼 보이지만 해부학적으로 부자연스러움.", "e.g., Right lower lung opacity looks pathology-like but anatomically unnatural."),
-                #     key=f"comment_{assignment_id}",
-                # )
                 confirm_all_checked = st.checkbox(
                     b("위 8개 artifact 항목을 모두 확인했습니다.", "I have reviewed all 8 artifact items."),
                     key=f"confirm_{assignment_id}",
@@ -536,22 +454,9 @@ def main():
 
         if submit:
             errors = []
-            if is_select_placeholder(is_frontal):
-                errors.append(b("frontal PA CXR 여부를 선택해주세요.", "Please select whether this is a frontal PA CXR."))
-            if is_select_placeholder(quality_score):
-                errors.append(b("품질 점수(1–5)를 선택해주세요.", "Please select a quality score."))
-            if is_select_placeholder(release):
-                errors.append(b("연구/AI 학습 데이터 사용 가능 여부를 선택해주세요.", "Please select suitability for research/AI training."))
-            if is_select_placeholder(clinical_issue):
-                errors.append(b("clinical issue 여부를 선택해주세요.", "Please select clinical issue status."))
-            if is_select_placeholder(downstream_risk):
-                errors.append(b("downstream AI 혼동 위험 여부를 선택해주세요.", "Please select downstream AI confusion risk."))
-            if is_select_placeholder(other_flag):
-                errors.append(b("기타 부자연스러움 여부를 선택해주세요.", "Please select other-flag status."))
-            if not main_reason:
-                errors.append(b("주요 reject/review 사유를 선택해주세요.", "Please select the main reject/review reason."))
-            if (other_flag == "Yes" or main_reason == "Other") and not comment.strip():
-                errors.append(b("기타/Other인 경우 코멘트를 작성해주세요.", "If Other is selected, please write a comment."))
+            for art in ARTIFACTS:
+                if artifact_values.get(art["key"], "") == "":
+                    errors.append(b(f"'{art['ko']}' 항목을 선택해주세요.", f"Please select '{art['en']}'."))
             if not confirm_all_checked:
                 errors.append(b("artifact 8개 항목 확인 체크가 필요합니다.", "Please confirm all 8 artifact items were reviewed."))
 
@@ -571,24 +476,10 @@ def main():
                     case["blinded_image_id"],
                     case["blinded_filename"],
                     case_hash,
-                    is_frontal,
-                    quality_score,
-                    release,
-                    clinical_issue,
-                    downstream_risk,
-                    artifact_values["marker"],
-                    artifact_values["density"],
-                    artifact_values["gas_lucency"],
-                    artifact_values["boundaries"],
-                    artifact_values["anterior_ribs"],
-                    artifact_values["wavy_clavicle"],
-                    artifact_values["organ_shape"],
-                    artifact_values["global_quality_fov_crop"],
-                    other_flag,
-                    main_reason,
-                    comment.strip(),
-                    f"{elapsed:.2f}",
                 ]
+                row += [artifact_values[a["key"]] for a in ARTIFACTS]
+                row += [f"{elapsed:.2f}"]
+
                 saved_to_sheet = False
                 if sheet:
                     try:
