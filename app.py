@@ -145,10 +145,6 @@ st.set_page_config(page_title=b("외부 합성 CXR artifact 설문", "External S
 # Google Sheets and local fallback
 # =========================================================
 def get_google_sheet(reader_id: str):
-    sh = gc.open(SHEET_NAME)
-
-    st.write("DEBUG worksheets:")
-    st.write([ws.title for ws in sh.worksheets()])
 
     if gspread is None or ServiceAccountCredentials is None:
         return None
@@ -163,7 +159,7 @@ def get_google_sheet(reader_id: str):
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sh = client.open(SHEET_NAME)
-        worksheet_name = [reader_id]["worksheet_name"]
+        worksheet_name = READER_CONFIG[reader_id]["worksheet_name"]
         try:
             ws = sh.worksheet(worksheet_name)
         except gspread.exceptions.WorksheetNotFound:
