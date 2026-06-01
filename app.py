@@ -22,10 +22,12 @@ def b(ko: str, en: str) -> str:
 # =========================================================
 # Study / App Config
 # =========================================================
-APP_VERSION = "M2SMF_EXTERNAL_SYNTH_ARTIFACT_ONLY_v1.1"
+APP_VERSION = "M2SMF_EXTERNAL_SYNTH_ARTIFACT_ONLY_v1.2"
 STUDY_ID = "M2SMF_External_Synthetic_CXR_Artifact_Checklist_300"
 
-# 새 artifact-only 설문은 기존 full-QA 설문과 header가 다르므로 새 Sheet 사용 권장.
+# 기존 Google Sheet 이름을 유지합니다.
+# 주의: 이번 v1.2는 저장 CSV/Sheet에 hidden metadata(source folder, CV status)를 포함합니다.
+# 따라서 Google Sheet를 평가자에게 직접 공유하면 blinding이 깨질 수 있습니다.
 SHEET_NAME = "M2SMF_survey"
 
 READER_CONFIG = {
@@ -128,11 +130,29 @@ BASE_HEADERS = [
     "blinded_filename",
     "case_hash",
 ]
-ARTIFACT_HEADERS = [a["sheet_col"] for a in ARTIFACTS]
-SHEET_HEADERS = BASE_HEADERS + ARTIFACT_HEADERS + ["time_spent_sec"]
 
+# 요청 조건 2, 3 반영:
+# 저장 CSV/Sheet에 원본 이미지의 폴더/파일명/경로와 cross-validation 여부를 함께 기록합니다.
+# UI에는 여전히 표시하지 않습니다.
+HIDDEN_METADATA_HEADERS = [
+    "source_image_folder",
+    "source_image_filename",
+    "source_image_relpath",
+    "source_image_path",
+    "generated_image_id",
+    "prompt_id",
+    "model_key",
+    "generator_name",
+    "cv_role",
+    "is_cross_validation_duplicate",
+]
+
+ARTIFACT_HEADERS = [a["sheet_col"] for a in ARTIFACTS]
+SHEET_HEADERS = BASE_HEADERS + HIDDEN_METADATA_HEADERS + ARTIFACT_HEADERS + ["time_spent_sec"]
+
+# 요청 조건 1 반영: 선택/Select placeholder 제거.
+# radio는 index=None으로 시작해, 사용자가 X/O/N/A 중 하나를 직접 선택해야 합니다.
 CHOICE_LABEL_TO_VALUE = {
-    b("선택", "Select"): "",
     b("X(없음)", "X(None)"): "X",
     b("O(있음)", "O(Present)"): "O",
     b("N/A(판단 불가)", "N/A(Unable to judge)"): "N/A",
@@ -145,7 +165,6 @@ st.set_page_config(page_title=b("외부 합성 CXR artifact 설문", "External S
 # Google Sheets and local fallback
 # =========================================================
 def get_google_sheet(reader_id: str):
-
     if gspread is None or ServiceAccountCredentials is None:
         return None
     try:
@@ -180,8 +199,8 @@ def ensure_sheet_header(sheet):
         elif values[0] != SHEET_HEADERS:
             st.warning(
                 b(
-                    "⚠️ Google Sheet 헤더가 현재 artifact-only 앱과 다릅니다. 새 worksheet 또는 새 sheet 사용을 권장합니다.",
-                    "⚠️ Google Sheet header differs from this artifact-only app. A new worksheet/sheet is recommended.",
+                    "⚠️ Google Sheet 헤더가 현재 artifact-only v1.2 앱과 다릅니다. 새 worksheet 또는 새 sheet 사용을 권장합니다.",
+                    "⚠️ Google Sheet header differs from this artifact-only v1.2 app. A new worksheet/sheet is recommended.",
                 )
             )
     except Exception as e:
@@ -296,6 +315,31 @@ def resolve_image_path(row: dict) -> str:
     return row.get("image_path") or row.get("image_relpath")
 
 
+def build_source_metadata(row: dict):
+    """
+    저장 CSV/Sheet에 넣을 원본 이미지 및 CV metadata를 구성합니다.
+    UI에는 표시하지 않지만, 추후 generator별/경로별/cross-validation 분석에 필요합니다.
+    """
+    relpath = row.get("image_relpath") or row.get("image_path") or ""
+    relpath_norm = os.path.normpath(relpath).replace("\\", "/") if relpath else ""
+    folder = row.get("folder") or ""
+    if not folder and relpath_norm:
+        folder = relpath_norm.split("/")[0] if "/" in relpath_norm else ""
+    filename = os.path.basename(relpath_norm) if relpath_norm else ""
+    return [
+        folder,
+        filename,
+        relpath_norm,
+        row.get("image_path", ""),
+        row.get("generated_image_id", ""),
+        row.get("prompt_id", ""),
+        row.get("model_key", ""),
+        row.get("generator_name", ""),
+        row.get("cv_role", ""),
+        str(row.get("is_cross_validation_duplicate", "")),
+    ]
+
+
 @st.cache_data(ttl=3600)
 def resize_image_pil(image_path, max_height=960):
     try:
@@ -315,11 +359,13 @@ def artifact_radio(artifact: dict, case_key: str):
     label = st.radio(
         b("선택", "Select"),
         options=CHOICE_LABELS,
-        index=0,
+        index=None,  # no default selection, but no explicit Select option
         horizontal=True,
         key=f"artifact_{artifact['key']}_{case_key}",
         label_visibility="collapsed",
     )
+    if label is None:
+        return ""
     return CHOICE_LABEL_TO_VALUE[label]
 
 # =========================================================
@@ -355,7 +401,7 @@ def main():
 
     st.sidebar.divider()
     st.sidebar.markdown("**" + b("평가 원칙", "Rating Principles") + "**")
-    st.sidebar.markdown("- " + b("generator, prompt, 병명, 나이, 성별은 블라인드 처리됩니다.", "Generator, prompt, disease, age, and sex are blinded."))
+    st.sidebar.markdown("- " + b("generator, prompt, 병명, 나이, 성별, cross-validation 여부는 화면에서 블라인드 처리됩니다.", "Generator, prompt, disease, age, sex, and cross-validation role are blinded on screen."))
     st.sidebar.markdown("- " + b("질병 진단 정확도나 release 여부가 아니라, 아래 artifact 유무만 평가합니다.", "Do not rate diagnosis accuracy or release suitability; only rate the artifact checklist below."))
     st.sidebar.markdown("- " + b("각 항목은 반드시 X/O/N/A 중 하나를 선택해주세요.", "For each artifact, select exactly one of X/O/N/A."))
 
@@ -377,6 +423,7 @@ def main():
     if sheet:
         ensure_sheet_header(sheet)
         st.sidebar.caption(b("Google Sheet 연결됨", "Google Sheet connected") + f": {SHEET_NAME}/{READER_CONFIG[reader_id]['worksheet_name']}")
+        st.sidebar.caption(b("주의: Sheet에는 hidden metadata가 저장됩니다. 평가자와 공유하지 마세요.", "Note: Sheet stores hidden metadata. Do not share it with readers."))
     else:
         st.sidebar.warning(b("Google Sheet 미연결: local CSV로 저장합니다.", "Google Sheet not connected: saving to local CSV."))
         st.sidebar.caption(local_result_path(reader_id))
@@ -433,7 +480,7 @@ def main():
             st.image(img, use_container_width=True)
         else:
             st.image(image_path, use_container_width=True)
-        st.caption(b("화면에는 generator/prompt/병명/나이/성별이 표시되지 않습니다.", "Generator/prompt/disease/age/sex are intentionally not shown."))
+        st.caption(b("화면에는 generator/prompt/병명/나이/성별/cross-validation 여부가 표시되지 않습니다.", "Generator/prompt/disease/age/sex/cross-validation role are intentionally not shown."))
 
     with col_right:
         st.subheader("📝 " + b("Artifact checklist", "Artifact checklist"))
@@ -478,6 +525,7 @@ def main():
                     case["blinded_filename"],
                     case_hash,
                 ]
+                row += build_source_metadata(case)
                 row += [artifact_values[a["key"]] for a in ARTIFACTS]
                 row += [f"{elapsed:.2f}"]
 
