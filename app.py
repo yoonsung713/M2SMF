@@ -285,35 +285,73 @@ def load_assignment():
 
 
 def resolve_image_path(row: dict) -> str:
+    """
+    image_path / image_relpath가 .png로 되어 있어도
+    실제 파일이 .jpg/.jpeg인 경우까지 찾아서 반환합니다.
+
+    예:
+      manifest: roentgen/P006.png
+      실제 파일: roentgen/P006.jpg
+      반환: roentgen/P006.jpg
+    """
     candidates = []
+
+    # 1) manifest에 들어있는 image_path, image_relpath 기반 후보 생성
     for key in ["image_path", "image_relpath"]:
         val = row.get(key, "")
-        if val:
-            candidates.append(val)
-            for root in IMAGE_ROOT_CANDIDATES:
-                candidates.append(os.path.join(root, val))
-    for candidate in candidates:
-        if candidate and os.path.exists(candidate):
-            return candidate
+        if not val:
+            continue
 
-    # Fallback: search by folder/name or basename.
-    rel = row.get("image_relpath", "")
-    basename = os.path.basename(rel or row.get("image_path", ""))
-    if basename:
+        # 원래 경로 + 확장자 variants
+        for v in _extension_variants(val):
+            candidates.append(v)
+
+        # root 후보와 결합한 경로 + 확장자 variants
+        for root in IMAGE_ROOT_CANDIDATES:
+            rooted = os.path.join(root, val)
+            for v in _extension_variants(rooted):
+                candidates.append(v)
+
+    # 2) exact path 또는 대소문자만 다른 path 확인
+    seen = set()
+    for candidate in candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+
+        found = _case_insensitive_existing_path(candidate)
+        if found:
+            return found
+
+    # 3) fallback: basename stem 기준으로 전체 검색
+    rel = row.get("image_relpath", "") or row.get("image_path", "")
+    basename = os.path.basename(rel)
+    stem, _ = os.path.splitext(basename)
+
+    if stem:
+        valid_exts = {".png", ".jpg", ".jpeg"}
         for root in IMAGE_ROOT_CANDIDATES:
             if not os.path.exists(root):
                 continue
-            for dirpath, _, filenames in os.walk(root):
-                if basename in filenames:
-                    candidate = os.path.join(dirpath, basename)
-                    norm_candidate = os.path.normpath(candidate).replace("\\", "/")
-                    norm_rel = os.path.normpath(rel).replace("\\", "/")
-                    if norm_rel and norm_candidate.endswith(norm_rel):
-                        return candidate
-                    if not norm_rel:
-                        return candidate
-    return row.get("image_path") or row.get("image_relpath")
 
+            for dirpath, _, filenames in os.walk(root):
+                for fname in filenames:
+                    fstem, fext = os.path.splitext(fname)
+                    if fstem == stem and fext.lower() in valid_exts:
+                        candidate = os.path.join(dirpath, fname)
+
+                        # 가능하면 원래 relpath의 folder까지 맞는 것을 우선 반환
+                        norm_candidate = os.path.normpath(candidate).replace("\\", "/")
+                        rel_folder = os.path.dirname(rel)
+                        if rel_folder:
+                            norm_rel_folder = os.path.normpath(rel_folder).replace("\\", "/")
+                            if f"/{norm_rel_folder}/" in f"/{norm_candidate}":
+                                return candidate
+                        else:
+                            return candidate
+
+    # 4) 그래도 못 찾으면 기존 값 반환
+    return row.get("image_path") or row.get("image_relpath")
 
 def build_source_metadata(row: dict):
     """
