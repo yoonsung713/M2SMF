@@ -29,10 +29,10 @@ STUDY_ID = "M2SMF_External_Synthetic_CXR_Artifact_Checklist_300"
 SHEET_NAME = "M2SMF_survey"
 
 READER_CONFIG = {
-    "professor_1": {"display_name": "professor_1", "worksheet_name": "P1"},
-    "professor_2": {"display_name": "P2", "worksheet_name": "P2"},
-    "professor_3": {"display_name": "P3", "worksheet_name": "P3"},
-    "professor_4": {"display_name": "P4", "worksheet_name": "P4"},
+    "Professor_1": {"display_name": "P1", "worksheet_name": "P1"},
+    "Professor_2": {"display_name": "P2", "worksheet_name": "P2"},
+    "Professor_3": {"display_name": "P3", "worksheet_name": "P3"},
+    "Professor_4": {"display_name": "P4", "worksheet_name": "P4"},
 }
 READER_OPTIONS = list(READER_CONFIG.keys())
 
