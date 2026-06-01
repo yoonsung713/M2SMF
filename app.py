@@ -455,50 +455,50 @@ def main():
         qa_box = st.container(height=790, border=True)
         with qa_box:
             with st.form(key=f"form_{reader_id}_{assignment_id}"):
-                st.markdown("##### " + b("1) 전반적 사용 가능성", "1) Overall usability"))
+                # st.markdown("##### " + b("1) 전반적 사용 가능성", "1) Overall usability"))
 
-                with st.expander(b("품질 점수 기준 보기", "Show quality score criteria"), expanded=False):
-                    st.markdown(
-                        "- **1**: " + b("비진단적/심한 합성 artifact로 연구·AI 학습 데이터로 사용 부적절", "Non-diagnostic or severe synthetic artifact; unsuitable for research/AI training") + "\n"
-                        "- **2**: " + b("명확한 합성 artifact가 있어 사용 위험", "Clear synthetic artifacts; risky to use") + "\n"
-                        "- **3**: " + b("경계선. 일부는 자연스럽지만 artifact 또는 구조 불일치가 의심", "Borderline; partly natural but suspicious artifacts or structural inconsistency") + "\n"
-                        "- **4**: " + b("대부분 자연스럽고 연구·AI 학습에 사용 가능해 보임", "Mostly natural and appears usable for research/AI training") + "\n"
-                        "- **5**: " + b("실제 PA CXR와 구별이 어렵고 전반적으로 매우 자연스러움", "Very hard to distinguish from real PA CXR; highly natural overall")
-                    )
+                # with st.expander(b("품질 점수 기준 보기", "Show quality score criteria"), expanded=False):
+                #     st.markdown(
+                #         "- **1**: " + b("비진단적/심한 합성 artifact로 연구·AI 학습 데이터로 사용 부적절", "Non-diagnostic or severe synthetic artifact; unsuitable for research/AI training") + "\n"
+                #         "- **2**: " + b("명확한 합성 artifact가 있어 사용 위험", "Clear synthetic artifacts; risky to use") + "\n"
+                #         "- **3**: " + b("경계선. 일부는 자연스럽지만 artifact 또는 구조 불일치가 의심", "Borderline; partly natural but suspicious artifacts or structural inconsistency") + "\n"
+                #         "- **4**: " + b("대부분 자연스럽고 연구·AI 학습에 사용 가능해 보임", "Mostly natural and appears usable for research/AI training") + "\n"
+                #         "- **5**: " + b("실제 PA CXR와 구별이 어렵고 전반적으로 매우 자연스러움", "Very hard to distinguish from real PA CXR; highly natural overall")
+                #     )
 
-                is_frontal = st.selectbox(
-                    b("A) 이 이미지는 frontal PA CXR처럼 보입니까?", "A) Does this look like a frontal PA CXR?"),
-                    options=[b("선택", "Select"), "Yes", "No", "Unclear"],
-                    index=0,
-                    key=f"frontal_{assignment_id}",
-                )
-                quality_score = st.selectbox(
-                    b("B) 합성 CXR 품질 점수", "B) Synthetic CXR quality score"),
-                    options=[b("선택", "Select"), "1", "2", "3", "4", "5"],
-                    index=0,
-                    key=f"quality_{assignment_id}",
-                )
-                release = st.selectbox(
-                    b("C) 실제 연구/AI 학습 데이터로 사용 가능하다고 보십니까?", "C) Suitable for real research/AI training data?"),
-                    options=[b("선택", "Select"), "Yes", "No"],
-                    index=0,
-                    key=f"release_{assignment_id}",
-                )
-                clinical_issue = st.selectbox(
-                    b("D) 임상적으로 중요한 합성 artifact 또는 비진단적 품질 문제가 있습니까?", "D) Clinically meaningful synthetic artifact or non-diagnostic quality issue?"),
-                    options=[b("선택", "Select"), "Yes", "No", "Unclear"],
-                    index=0,
-                    key=f"clinical_issue_{assignment_id}",
-                )
-                downstream_risk = st.selectbox(
-                    b(
-                        "E) downstream AI가 병변 표현과 합성 artifact를 혼동할 위험이 있다고 보십니까?",
-                        "E) Risk that downstream AI could confuse synthetic artifact with pathology?",
-                    ),
-                    options=[b("선택", "Select"), "Yes", "No", "Unclear"],
-                    index=0,
-                    key=f"downstream_risk_{assignment_id}",
-                )
+                # is_frontal = st.selectbox(
+                #     b("A) 이 이미지는 frontal PA CXR처럼 보입니까?", "A) Does this look like a frontal PA CXR?"),
+                #     options=[b("선택", "Select"), "Yes", "No", "Unclear"],
+                #     index=0,
+                #     key=f"frontal_{assignment_id}",
+                # )
+                # quality_score = st.selectbox(
+                #     b("B) 합성 CXR 품질 점수", "B) Synthetic CXR quality score"),
+                #     options=[b("선택", "Select"), "1", "2", "3", "4", "5"],
+                #     index=0,
+                #     key=f"quality_{assignment_id}",
+                # )
+                # release = st.selectbox(
+                #     b("C) 실제 연구/AI 학습 데이터로 사용 가능하다고 보십니까?", "C) Suitable for real research/AI training data?"),
+                #     options=[b("선택", "Select"), "Yes", "No"],
+                #     index=0,
+                #     key=f"release_{assignment_id}",
+                # )
+                # clinical_issue = st.selectbox(
+                #     b("D) 임상적으로 중요한 합성 artifact 또는 비진단적 품질 문제가 있습니까?", "D) Clinically meaningful synthetic artifact or non-diagnostic quality issue?"),
+                #     options=[b("선택", "Select"), "Yes", "No", "Unclear"],
+                #     index=0,
+                #     key=f"clinical_issue_{assignment_id}",
+                # )
+                # downstream_risk = st.selectbox(
+                #     b(
+                #         "E) downstream AI가 병변 표현과 합성 artifact를 혼동할 위험이 있다고 보십니까?",
+                #         "E) Risk that downstream AI could confuse synthetic artifact with pathology?",
+                #     ),
+                #     options=[b("선택", "Select"), "Yes", "No", "Unclear"],
+                #     index=0,
+                #     key=f"downstream_risk_{assignment_id}",
+                # )
 
                 st.markdown("---")
                 st.markdown("##### " + b("2) Artifact checklist", "2) Artifact checklist"))
@@ -509,25 +509,25 @@ def main():
                     st.markdown("")
 
                 st.markdown("---")
-                st.markdown("##### " + b("3) 주요 사유와 코멘트", "3) Main reason and comment"))
-                other_flag = st.selectbox(
-                    b("기타 부자연스러움이 있습니까?", "Any other unnatural finding?"),
-                    options=[b("선택", "Select"), "Yes", "No"],
-                    index=0,
-                    key=f"other_{assignment_id}",
-                )
-                main_reason = st.selectbox(
-                    b("주요 reject/review 사유", "Main reject/review reason"),
-                    options=REJECTION_REASONS,
-                    index=0,
-                    key=f"reason_{assignment_id}",
-                )
-                comment = st.text_area(
-                    b("코멘트 — 부자연스러운 부위/이유를 짧게 기록", "Comment — brief location/reason"),
-                    height=90,
-                    placeholder=b("예: 우측 하폐야 음영이 병변처럼 보이지만 해부학적으로 부자연스러움.", "e.g., Right lower lung opacity looks pathology-like but anatomically unnatural."),
-                    key=f"comment_{assignment_id}",
-                )
+                # st.markdown("##### " + b("3) 주요 사유와 코멘트", "3) Main reason and comment"))
+                # other_flag = st.selectbox(
+                #     b("기타 부자연스러움이 있습니까?", "Any other unnatural finding?"),
+                #     options=[b("선택", "Select"), "Yes", "No"],
+                #     index=0,
+                #     key=f"other_{assignment_id}",
+                # )
+                # main_reason = st.selectbox(
+                #     b("주요 reject/review 사유", "Main reject/review reason"),
+                #     options=REJECTION_REASONS,
+                #     index=0,
+                #     key=f"reason_{assignment_id}",
+                # )
+                # comment = st.text_area(
+                #     b("코멘트 — 부자연스러운 부위/이유를 짧게 기록", "Comment — brief location/reason"),
+                #     height=90,
+                #     placeholder=b("예: 우측 하폐야 음영이 병변처럼 보이지만 해부학적으로 부자연스러움.", "e.g., Right lower lung opacity looks pathology-like but anatomically unnatural."),
+                #     key=f"comment_{assignment_id}",
+                # )
                 confirm_all_checked = st.checkbox(
                     b("위 8개 artifact 항목을 모두 확인했습니다.", "I have reviewed all 8 artifact items."),
                     key=f"confirm_{assignment_id}",
