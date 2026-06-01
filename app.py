@@ -498,7 +498,7 @@ def artifact_radio(artifact: dict, case_key: str):
 # Main
 # =========================================================
 def main():
-    st.title("🩻 " + b("외부 합성 CXR Artifact Checklist 설문", "External Synthetic CXR Artifact Checklist Survey"))
+    st.title(b("외부 합성 CXR Artifact Checklist 설문", "External Synthetic CXR Artifact Checklist Survey"))
     st.caption(
         b(
             "본 설문은 Nano Banana, Sana, ChatGPT Images 2.0, RoentGen-v2로 생성된 합성 CXR의 artifact 유무만 블라인드로 평가합니다.",
@@ -563,7 +563,7 @@ def main():
     st.session_state["current_index"] = start_index
 
     if st.session_state["current_index"] >= total_cases:
-        st.success(b("🎉 모든 평가 케이스가 완료되었습니다. 감사합니다!", "🎉 All assigned cases are complete. Thank you!"))
+        st.success(b("모든 평가 케이스가 완료되었습니다. 감사합니다!", "All assigned cases are complete. Thank you!"))
         st.balloons()
         return
 
@@ -609,7 +609,7 @@ def main():
         st.caption(b("화면에는 generator/prompt/병명/나이/성별/cross-validation 여부가 표시되지 않습니다.", "Generator/prompt/disease/age/sex/cross-validation role are intentionally not shown."))
 
     with col_right:
-        st.subheader("📝 " + b("Artifact checklist", "Artifact checklist"))
+        st.subheader(b("Artifact checklist", "Artifact checklist"))
         qa_box = st.container(height=790, border=True)
         with qa_box:
             with st.form(key=f"form_{reader_id}_{assignment_id}"):
@@ -624,7 +624,7 @@ def main():
                     b("위 8개 artifact 항목을 모두 확인했습니다.", "I have reviewed all 8 artifact items."),
                     key=f"confirm_{assignment_id}",
                 )
-                submit = st.form_submit_button(b("💾 저장하고 다음으로", "💾 Save & Next"), type="primary", use_container_width=True)
+                submit = st.form_submit_button(b("저장하고 다음으로", "Save & Next"), type="primary", use_container_width=True)
 
         if submit:
             errors = []
