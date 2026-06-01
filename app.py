@@ -26,7 +26,7 @@ APP_VERSION = "M2SMF_EXTERNAL_SYNTH_ARTIFACT_ONLY_v1.1"
 STUDY_ID = "M2SMF_External_Synthetic_CXR_Artifact_Checklist_300"
 
 # 새 artifact-only 설문은 기존 full-QA 설문과 header가 다르므로 새 Sheet 사용 권장.
-SHEET_NAME = "M2SMF_external_synth_artifact_survey"
+SHEET_NAME = "M2SMF_survey"
 
 READER_CONFIG = {
     "professor_1": {"display_name": "Professor 1", "worksheet_name": "Professor_1"},
