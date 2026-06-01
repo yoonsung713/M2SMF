@@ -284,6 +284,68 @@ def load_assignment():
     )
 
 
+def _case_insensitive_existing_path(path: str):
+    """
+    Exact path가 없을 때, 같은 폴더 안에서 대소문자만 다른 파일을 찾습니다.
+    예: P006.png vs P006.PNG
+    """
+    if not path:
+        return None
+
+    if os.path.exists(path):
+        return path
+
+    folder = os.path.dirname(path) or "."
+    filename = os.path.basename(path)
+
+    if not os.path.isdir(folder):
+        return None
+
+    filename_lower = filename.lower()
+    for f in os.listdir(folder):
+        if f.lower() == filename_lower:
+            candidate = os.path.join(folder, f)
+            if os.path.exists(candidate):
+                return candidate
+
+    return None
+
+
+def _extension_variants(path: str):
+    """
+    manifest에는 .png로 되어 있지만 실제 파일은 .jpg일 수 있으므로
+    같은 stem에 대해 여러 확장자를 시도합니다.
+    """
+    if not path:
+        return []
+
+    root, ext = os.path.splitext(path)
+    exts = [
+        ext,
+        ext.lower(),
+        ext.upper(),
+        ".png",
+        ".PNG",
+        ".jpg",
+        ".JPG",
+        ".jpeg",
+        ".JPEG",
+    ]
+
+    # 중복 제거하면서 순서 유지
+    seen = set()
+    variants = []
+    for e in exts:
+        if not e:
+            continue
+        candidate = root + e
+        if candidate not in seen:
+            seen.add(candidate)
+            variants.append(candidate)
+
+    return variants
+
+
 def resolve_image_path(row: dict) -> str:
     """
     image_path / image_relpath가 .png로 되어 있어도
@@ -352,6 +414,7 @@ def resolve_image_path(row: dict) -> str:
 
     # 4) 그래도 못 찾으면 기존 값 반환
     return row.get("image_path") or row.get("image_relpath")
+    
 
 def build_source_metadata(row: dict):
     """
