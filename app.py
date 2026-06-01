@@ -29,10 +29,10 @@ STUDY_ID = "M2SMF_External_Synthetic_CXR_Artifact_Checklist_300"
 SHEET_NAME = "M2SMF_survey"
 
 READER_CONFIG = {
-    "Professor_1": {"display_name": "P1", "worksheet_name": "P1"},
-    "Professor_2": {"display_name": "P2", "worksheet_name": "P2"},
-    "Professor_3": {"display_name": "P3", "worksheet_name": "P3"},
-    "Professor_4": {"display_name": "P4", "worksheet_name": "P4"},
+    "professor_1": {"display_name": "P1", "worksheet_name": "P1"},
+    "professor_2": {"display_name": "P2", "worksheet_name": "P2"},
+    "professor_3": {"display_name": "P3", "worksheet_name": "P3"},
+    "professor_4": {"display_name": "P4", "worksheet_name": "P4"},
 }
 READER_OPTIONS = list(READER_CONFIG.keys())
 
@@ -145,6 +145,11 @@ st.set_page_config(page_title=b("외부 합성 CXR artifact 설문", "External S
 # Google Sheets and local fallback
 # =========================================================
 def get_google_sheet(reader_id: str):
+    sh = gc.open(SHEET_NAME)
+
+    st.write("DEBUG worksheets:")
+    st.write([ws.title for ws in sh.worksheets()])
+
     if gspread is None or ServiceAccountCredentials is None:
         return None
     try:
