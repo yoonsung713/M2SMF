@@ -1,20 +1,17 @@
+
 import streamlit as st
 import os
 import time
+import random
 import hashlib
 import csv
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 from PIL import Image
 
-try:
-    import gspread
-    from oauth2client.service_account import ServiceAccountCredentials
-except Exception:
-    gspread = None
-    ServiceAccountCredentials = None
-
 # =========================================================
-# Bilingual helper
+# Bilingual helper (Korean / English)
 # =========================================================
 def b(ko: str, en: str) -> str:
     return f"{ko} / {en}"
@@ -22,167 +19,91 @@ def b(ko: str, en: str) -> str:
 # =========================================================
 # Study / App Config
 # =========================================================
-APP_VERSION = "M2SMF_EXTERNAL_SYNTH_ARTIFACT_ONLY_v1.2"
-STUDY_ID = "M2SMF_External_Synthetic_CXR_Artifact_Checklist_300"
+APP_VERSION = "M2SMF_QA_SURVEY_v2.3_YANG_CROSS"
+STUDY_ID = "M2SMF_Synthetic_CXR_QA_Yang_CrossEval"
 
-# 기존 Google Sheet 이름을 유지합니다.
-# 주의: 이번 v1.2는 저장 CSV/Sheet에 hidden metadata(source folder, CV status)를 포함합니다.
-# 따라서 Google Sheet를 평가자에게 직접 공유하면 blinding이 깨질 수 있습니다.
+RATER_CONFIG = {
+    "cross": {
+        "display_name": "validation",
+        "worksheet_name": "R4_cross",
+        "manifest_paths": [
+            "M2SMF_Yang_cross_eval_manifest.csv",
+            "./M2SMF_Yang_cross_eval_manifest.csv",
+            "/mnt/data/M2SMF_Yang_cross_eval_manifest.csv",
+        ],
+    },
+}
+
+RATER_OPTIONS = list(RATER_CONFIG.keys())
+
+EXAMPLE_IMAGES_DIR = "images"
+IMAGE_ROOT_CANDIDATES = [".", "/mnt/data"]
+
+# Streamlit page
+st.set_page_config(
+    page_title=b("교차평가 설문", "Cross-evaluation Survey"),
+    layout="wide"
+)
+
+# =========================================================
+# Google Sheets
+# =========================================================
 SHEET_NAME = "M2SMF_survey"
 
-READER_CONFIG = {
-    "professor_1": {"display_name": "P1", "worksheet_name": "P1"},
-    "professor_2": {"display_name": "P2", "worksheet_name": "P2"},
-    "professor_3": {"display_name": "P3", "worksheet_name": "P3"},
-    "professor_4": {"display_name": "P4", "worksheet_name": "P4"},
-}
-READER_OPTIONS = list(READER_CONFIG.keys())
-
-# The hidden assignment must be kept from readers. The app uses it internally only.
-ASSIGNMENT_PATH_CANDIDATES = [
-    "survey_manifests/M2SMF_external_QA_hidden_assignment.csv",
-    "M2SMF_external_QA_hidden_assignment.csv",
-    "./M2SMF_external_QA_hidden_assignment.csv",
-    "/mnt/data/M2SMF_external_QA_hidden_assignment.csv",
-]
-IMAGE_ROOT_CANDIDATES = [".", "./images", "/mnt/data"]
-LOCAL_RESULT_DIR = "local_survey_results"
-
-# NOTE:
-# 이 앱은 artifact checklist만 받습니다.
-# quality score, release, clinical issue, downstream confusion risk, comment는 받지 않습니다.
-# 저장값은 분석이 쉽도록 bilingual label이 아니라 X / O / N/A로 normalize합니다.
-ARTIFACTS = [
-    {
-        "key": "marker",
-        "sheet_col": "artifact_marker_OXN",
-        "ko": "1) 위치 마커/문자/라벨 이상",
-        "en": "1) Marker/text/label artifact",
-        "desc_ko": "L/R 마커, 문자, 병원 로고, 표시선, 비현실적 텍스트 또는 라벨이 보임",
-        "desc_en": "Visible L/R marker, text, logo, line, non-radiographic label, or unrealistic typography",
-    },
-    {
-        "key": "density",
-        "sheet_col": "artifact_density_OXN",
-        "ko": "2) 비현실적 투과도/밀도 artifact",
-        "en": "2) Unrealistic density/penetration artifact",
-        "desc_ko": "병변처럼 보일 수 있는 비현실적 음영, 얼룩, 과도한 smoothing, 물리적으로 어색한 density",
-        "desc_en": "Unrealistic opacity, blotch, over-smoothing, or physically implausible density that could mimic pathology",
-    },
-    {
-        "key": "gas_lucency",
-        "sheet_col": "artifact_gas_lucency_OXN",
-        "ko": "3) 비현실적 gas/lucency pattern",
-        "en": "3) Unrealistic gas/lucency pattern",
-        "desc_ko": "상복부/하부 흉부의 gas, lucency, diaphragm 아래 음영이 해부학적으로 부자연스러움",
-        "desc_en": "Unrealistic gas/lucency around the lower chest/upper abdomen or below the diaphragm",
-    },
-    {
-        "key": "boundaries",
-        "sheet_col": "artifact_boundaries_OXN",
-        "ko": "4) 해부학적 경계 불명확/붕괴",
-        "en": "4) Vague or collapsed anatomical boundaries",
-        "desc_ko": "심장, 종격동, 횡격막, 폐야, 피부/연조직 경계가 흐리거나 구조적으로 붕괴",
-        "desc_en": "Blurred or collapsed borders of heart, mediastinum, diaphragm, lungs, skin/soft tissue",
-    },
-    {
-        "key": "anterior_ribs",
-        "sheet_col": "artifact_anterior_ribs_OXN",
-        "ko": "5) 전방 늑골 소실/끊김/왜곡",
-        "en": "5) Missing/broken/distorted anterior ribs",
-        "desc_ko": "전방 늑골이 비현실적으로 사라지거나 끊기거나, 늑골 구조가 병변처럼 왜곡됨",
-        "desc_en": "Anterior ribs disappear, break, or distort unrealistically and may mimic or obscure disease",
-    },
-    {
-        "key": "wavy_clavicle",
-        "sheet_col": "artifact_wavy_clavicle_OXN",
-        "ko": "6) 쇄골 형태 이상",
-        "en": "6) Wavy or abnormal clavicle",
-        "desc_ko": "쇄골 윤곽이 물결 모양, 울퉁불퉁, 비대칭으로 부자연스러움. 단독으로는 low-quality 결정 근거가 아닐 수 있음",
-        "desc_en": "Clavicle contour is wavy, bumpy, or asymmetric. This alone may not define low quality",
-    },
-    {
-        "key": "organ_shape",
-        "sheet_col": "artifact_organ_shape_OXN",
-        "ko": "7) 장기/심장/종격동/횡격막 형태 이상",
-        "en": "7) Abnormal organ, cardiac, mediastinal, or diaphragm shape",
-        "desc_ko": "심장, 종격동, 횡격막, 폐야 형태가 해부학적으로 불가능하거나 비현실적",
-        "desc_en": "Heart, mediastinum, diaphragm, or lung contour is anatomically impossible or unrealistic",
-    },
-    {
-        "key": "global_quality_fov_crop",
-        "sheet_col": "artifact_global_quality_fov_crop_OXN",
-        "ko": "8) 전반적 non-diagnostic 품질/FOV/crop 문제",
-        "en": "8) Global non-diagnostic quality, FOV, or crop problem",
-        "desc_ko": "폐야/흉곽이 잘리거나, PA CXR로 보기 어렵거나, 전반적 품질 때문에 연구/AI 학습에 부적절",
-        "desc_en": "Lung/chest is cropped, image is not a usable PA CXR, or global quality is unsuitable for research/AI training",
-    },
-]
-
-BASE_HEADERS = [
+SHEET_HEADERS = [
     "timestamp",
     "study_id",
     "app_version",
-    "reader_id",
-    "assignment_id",
-    "reader_sequence",
-    "blinded_image_id",
-    "blinded_filename",
+    "rater_id",
+    "case_order",
     "case_hash",
+    "image_id",
+    "source_quality_hidden",
+    "original_rater",
+    "selection_bucket",
+    "selection_note",
+    "original_score",
+    "original_release",
+    "original_case_order",
+    "quality_score_1to5",
+    "release_recommend_yesno",
+    "artifact_marker_OXN",
+    "artifact_density_OXN",
+    "artifact_gas_OXN",
+    "artifact_boundaries_OXN",
+    "artifact_anterior_ribs_OXN",
+    "artifact_wavy_clavicle_OXN",
+    "artifact_organ_shape_OXN",
+    "other_flag_yesno",
+    "comment",
+    "time_spent_sec",
 ]
 
-# 요청 조건 2, 3 반영:
-# 저장 CSV/Sheet에 원본 이미지의 폴더/파일명/경로와 cross-validation 여부를 함께 기록합니다.
-# UI에는 여전히 표시하지 않습니다.
-HIDDEN_METADATA_HEADERS = [
-    "source_image_folder",
-    "source_image_filename",
-    "source_image_relpath",
-    "source_image_path",
-    "generated_image_id",
-    "prompt_id",
-    "model_key",
-    "generator_name",
-    "cv_role",
-    "is_cross_validation_duplicate",
-]
 
-ARTIFACT_HEADERS = [a["sheet_col"] for a in ARTIFACTS]
-SHEET_HEADERS = BASE_HEADERS + HIDDEN_METADATA_HEADERS + ARTIFACT_HEADERS + ["time_spent_sec"]
-
-# 요청 조건 1 반영: 선택/Select placeholder 제거.
-# radio는 index=None으로 시작해, 사용자가 X/O/N/A 중 하나를 직접 선택해야 합니다.
-CHOICE_LABEL_TO_VALUE = {
-    b("X(없음)", "X(None)"): "X",
-    b("O(있음)", "O(Present)"): "O",
-    b("N/A(판단 불가)", "N/A(Unable to judge)"): "N/A",
-}
-CHOICE_LABELS = list(CHOICE_LABEL_TO_VALUE.keys())
-
-st.set_page_config(page_title=b("외부 합성 CXR artifact 설문", "External Synthetic CXR Artifact Survey"), layout="wide")
-
-# =========================================================
-# Google Sheets and local fallback
-# =========================================================
-def get_google_sheet(reader_id: str):
-    if gspread is None or ServiceAccountCredentials is None:
-        return None
+def get_google_sheet(rater_id: str):
+    """
+    rater_id별 워크시트(탭)에 기록.
+    """
     try:
         scope = [
             "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
+            "https://www.googleapis.com/auth/drive"
         ]
         if "gcp_service_account" not in st.secrets:
             return None
+
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
+
         sh = client.open(SHEET_NAME)
-        worksheet_name = READER_CONFIG[reader_id]["worksheet_name"]
+        worksheet_name = RATER_CONFIG[rater_id]["worksheet_name"]
+
         try:
             ws = sh.worksheet(worksheet_name)
         except gspread.exceptions.WorksheetNotFound:
-            ws = sh.add_worksheet(title=worksheet_name, rows=1000, cols=len(SHEET_HEADERS))
+            ws = sh.add_worksheet(title=worksheet_name, rows=2000, cols=len(SHEET_HEADERS))
+
         return ws
     except Exception as e:
         st.sidebar.error(b("Google Sheet 연결 실패", "Google Sheet connection failed") + f": {e}")
@@ -190,323 +111,479 @@ def get_google_sheet(reader_id: str):
 
 
 def ensure_sheet_header(sheet):
-    if not sheet:
-        return
     try:
         values = sheet.get_all_values()
         if len(values) == 0:
             sheet.append_row(SHEET_HEADERS)
-        elif values[0] != SHEET_HEADERS:
+            return
+        if values[0] != SHEET_HEADERS:
             st.warning(
                 b(
-                    "⚠️ Google Sheet 헤더가 현재 artifact-only v1.2 앱과 다릅니다. 새 worksheet 또는 새 sheet 사용을 권장합니다.",
-                    "⚠️ Google Sheet header differs from this artifact-only v1.2 app. A new worksheet/sheet is recommended.",
+                    "⚠️ Google Sheet의 헤더가 현재 앱과 다릅니다. 새 워크시트/새 시트 사용을 권장합니다.",
+                    "⚠️ Google Sheet header differs from this app. A new worksheet/sheet is recommended."
                 )
             )
     except Exception as e:
-        st.sidebar.error(b("Google Sheet 헤더 확인 실패", "Google Sheet header check failed") + f": {e}")
+        st.sidebar.error(b("Google Sheet 연결 실패", "Google Sheet connection failed") + f": {e}")
 
 
-def local_result_path(reader_id: str) -> str:
-    os.makedirs(LOCAL_RESULT_DIR, exist_ok=True)
-    return os.path.join(LOCAL_RESULT_DIR, f"{STUDY_ID}_{reader_id}.csv")
-
-
-def append_local_result(reader_id: str, row: list):
-    path = local_result_path(reader_id)
-    new_file = not os.path.exists(path)
-    with open(path, "a", encoding="utf-8-sig", newline="") as f:
-        writer = csv.writer(f)
-        if new_file:
-            writer.writerow(SHEET_HEADERS)
-        writer.writerow(row)
-
-
-def load_processed_assignment_ids(sheet, reader_id: str):
+def load_processed_image_ids(sheet, rater_id: str):
     processed = set()
-    # Google Sheet rows
-    if sheet:
-        try:
-            rows = sheet.get_all_values()
-            if len(rows) > 1:
-                header = rows[0]
-                idx_study = header.index("study_id") if "study_id" in header else 1
-                idx_reader = header.index("reader_id") if "reader_id" in header else 3
-                idx_assignment = header.index("assignment_id") if "assignment_id" in header else 4
-                for row in rows[1:]:
-                    if len(row) <= max(idx_study, idx_reader, idx_assignment):
-                        continue
-                    if row[idx_study] == STUDY_ID and row[idx_reader] == reader_id:
-                        processed.add(row[idx_assignment])
-        except Exception:
-            pass
-    # Local fallback rows
-    path = local_result_path(reader_id)
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8-sig", newline="") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row.get("study_id") == STUDY_ID and row.get("reader_id") == reader_id:
-                        processed.add(row.get("assignment_id", ""))
-        except Exception:
-            pass
+    if not sheet:
+        return processed
+
+    try:
+        rows = sheet.get_all_values()
+        if len(rows) <= 1:
+            return processed
+
+        header = rows[0]
+        idx_study = header.index("study_id") if "study_id" in header else 1
+        idx_rater = header.index("rater_id") if "rater_id" in header else 3
+        idx_imgid = header.index("image_id") if "image_id" in header else 6
+
+        for row in rows[1:]:
+            if len(row) <= max(idx_study, idx_rater, idx_imgid):
+                continue
+            if row[idx_study] == STUDY_ID and row[idx_rater] == rater_id:
+                processed.add(row[idx_imgid])
+    except Exception:
+        pass
+
     return processed
 
+
 # =========================================================
-# Assignment / image loading
+# Manifest / Image Loading
 # =========================================================
 @st.cache_data
-def load_assignment():
-    for path in ASSIGNMENT_PATH_CANDIDATES:
+def load_manifest(manifest_paths):
+    for path in manifest_paths:
         if path and os.path.exists(path):
             with open(path, "r", encoding="utf-8-sig", newline="") as f:
-                rows = [row for row in csv.DictReader(f)]
-            required_cols = [
-                "assignment_id",
-                "reader_id",
-                "reader_sequence",
-                "blinded_image_id",
-                "blinded_filename",
-                "case_hash",
-                "image_relpath",
-                "image_path",
-                "generated_image_id",
-                "prompt_id",
-                "model_key",
-            ]
-            missing = [c for c in required_cols if len(rows) == 0 or c not in rows[0]]
-            if missing:
-                raise RuntimeError(f"Assignment CSV is missing columns: {missing}")
+                reader = csv.DictReader(f)
+                rows = [row for row in reader if row.get("image_id")]
             return rows, path
     raise FileNotFoundError(
-        "Hidden assignment manifest not found. Expected one of: " + ", ".join(ASSIGNMENT_PATH_CANDIDATES)
+        "Cross-evaluation manifest not found. "
+        "Expected one of: " + ", ".join(manifest_paths)
     )
 
 
-def resolve_image_path(row: dict) -> str:
-    candidates = []
-    for key in ["image_path", "image_relpath"]:
-        val = row.get(key, "")
-        if val:
-            candidates.append(val)
-            for root in IMAGE_ROOT_CANDIDATES:
-                candidates.append(os.path.join(root, val))
+def resolve_image_path(image_id: str) -> str:
+    if not image_id:
+        return image_id
+
+    candidates = [image_id]
+    for root in IMAGE_ROOT_CANDIDATES:
+        candidates.append(os.path.join(root, image_id))
+
     for candidate in candidates:
-        if candidate and os.path.exists(candidate):
+        if os.path.exists(candidate):
             return candidate
 
-    # Fallback: search by folder/name or basename.
-    rel = row.get("image_relpath", "")
-    basename = os.path.basename(rel or row.get("image_path", ""))
-    if basename:
-        for root in IMAGE_ROOT_CANDIDATES:
-            if not os.path.exists(root):
-                continue
-            for dirpath, _, filenames in os.walk(root):
-                if basename in filenames:
-                    candidate = os.path.join(dirpath, basename)
-                    norm_candidate = os.path.normpath(candidate).replace("\\", "/")
-                    norm_rel = os.path.normpath(rel).replace("\\", "/")
-                    if norm_rel and norm_candidate.endswith(norm_rel):
-                        return candidate
-                    if not norm_rel:
-                        return candidate
-    return row.get("image_path") or row.get("image_relpath")
+    basename = os.path.basename(image_id)
+    for root in IMAGE_ROOT_CANDIDATES:
+        if not os.path.exists(root):
+            continue
+        for dirpath, _, filenames in os.walk(root):
+            if basename in filenames:
+                candidate = os.path.join(dirpath, basename)
+                norm_candidate = os.path.normpath(candidate).replace("\\", "/")
+                norm_image_id = os.path.normpath(image_id).replace("\\", "/")
+                if norm_candidate.endswith(norm_image_id):
+                    return candidate
+
+    return image_id
 
 
-def build_source_metadata(row: dict):
-    """
-    저장 CSV/Sheet에 넣을 원본 이미지 및 CV metadata를 구성합니다.
-    UI에는 표시하지 않지만, 추후 generator별/경로별/cross-validation 분석에 필요합니다.
-    """
-    relpath = row.get("image_relpath") or row.get("image_path") or ""
-    relpath_norm = os.path.normpath(relpath).replace("\\", "/") if relpath else ""
-    folder = row.get("folder") or ""
-    if not folder and relpath_norm:
-        folder = relpath_norm.split("/")[0] if "/" in relpath_norm else ""
-    filename = os.path.basename(relpath_norm) if relpath_norm else ""
-    return [
-        folder,
-        filename,
-        relpath_norm,
-        row.get("image_path", ""),
-        row.get("generated_image_id", ""),
-        row.get("prompt_id", ""),
-        row.get("model_key", ""),
-        row.get("generator_name", ""),
-        row.get("cv_role", ""),
-        str(row.get("is_cross_validation_duplicate", "")),
-    ]
+def make_image_id(image_path: str) -> str:
+    norm_path = os.path.normpath(image_path).replace("\\", "/")
+    return norm_path
+
+
+def hash_case(image_id: str) -> str:
+    return hashlib.sha1(image_id.encode("utf-8")).hexdigest()[:10]
+
+
+def get_example_image_path(question_key):
+    mapping = {
+        "marker_error": "texture1.png",
+        "density_penetration": "texture2.png",
+        "abnormal_gas": "texture3.png",
+        "vague_boundaries": "anatomy1.png",
+        "anterior_ribs": "anatomy2.png",
+        "wavy_clavicle": "anatomy3.png",
+        "abnormal_organ_shape": "anatomy4.png",
+    }
+    filename = mapping.get(question_key)
+    if filename:
+        return os.path.join(EXAMPLE_IMAGES_DIR, filename)
+    return None
 
 
 @st.cache_data(ttl=3600)
-def resize_image_pil(image_path, max_height=960):
+def resize_image_pil(image_path, target_height):
     try:
-        img = Image.open(image_path).convert("RGB")
-        if img.height <= max_height:
-            return img
+        img = Image.open(image_path)
         aspect_ratio = img.width / img.height
-        new_width = int(max_height * aspect_ratio)
-        return img.resize((new_width, max_height), Image.LANCZOS)
+        new_width = int(target_height * aspect_ratio)
+        resized_img = img.resize((new_width, target_height), Image.LANCZOS)
+        return resized_img
     except Exception:
         return None
 
 
-def artifact_radio(artifact: dict, case_key: str):
-    st.markdown(f"**{b(artifact['ko'], artifact['en'])}**")
-    st.caption(b(artifact["desc_ko"], artifact["desc_en"]))
-    label = st.radio(
-        b("선택", "Select"),
-        options=CHOICE_LABELS,
-        index=None,  # no default selection, but no explicit Select option
-        horizontal=True,
-        key=f"artifact_{artifact['key']}_{case_key}",
-        label_visibility="collapsed",
-    )
-    if label is None:
-        return ""
-    return CHOICE_LABEL_TO_VALUE[label]
+def build_case_list_for_rater(rater_id: str):
+    cfg = RATER_CONFIG[rater_id]
+    manifest_rows, manifest_path = load_manifest(cfg["manifest_paths"])
+
+    required_cols = [
+        "blind_case_order",
+        "image_id",
+        "source_quality_hidden",
+        "original_rater",
+        "final_bucket",
+        "selection_note",
+        "score",
+        "release",
+        "case_order",
+    ]
+    for col in required_cols:
+        if len(manifest_rows) == 0 or col not in manifest_rows[0]:
+            raise RuntimeError(f"Manifest is missing required column: {col}")
+
+    cases = []
+    for row in manifest_rows:
+        image_id = row["image_id"]
+        resolved_path = resolve_image_path(image_id)
+
+        cases.append({
+            "path": resolved_path,
+            "image_id": image_id,
+            "source_quality_hidden": row["source_quality_hidden"],
+            "original_rater": row["original_rater"],
+            "selection_bucket": row["final_bucket"],
+            "selection_note": row["selection_note"],
+            "original_score": str(row["score"]),
+            "original_release": row["release"],
+            "original_case_order": str(row["case_order"]),
+            "blind_case_order": int(row["blind_case_order"]),
+        })
+
+    cases = sorted(cases, key=lambda x: x["blind_case_order"])
+    return cases, manifest_path
+
+
+# =========================================================
+# UI Helpers
+# =========================================================
+def artifact_radio(label_title_ko, label_title_en, description_ko, description_en, key_prefix, example_key=None):
+    try:
+        q_col, img_col = st.columns([7, 3], vertical_alignment="top")
+    except TypeError:
+        q_col, img_col = st.columns([7, 3])
+
+    with q_col:
+        st.markdown(f"**{b(label_title_ko, label_title_en)}**")
+        if description_ko or description_en:
+            st.caption(b(description_ko, description_en))
+
+        choice = st.radio(
+            b("선택", "Select"),
+            options=[
+                b("X(없음)", "X(None)"),
+                b("O(있음)", "O(Present)"),
+                b("N/A(판단 불가)", "N/A(Unable to judge)"),
+            ],
+            index=0,
+            horizontal=True,
+            key=key_prefix,
+            label_visibility="collapsed"
+        )
+
+    with img_col:
+        if example_key:
+            example_path = get_example_image_path(example_key)
+            if example_path and os.path.exists(example_path):
+                resized = resize_image_pil(example_path, target_height=90)
+                if resized:
+                    st.image(resized, use_container_width=False)
+
+    return choice
+
 
 # =========================================================
 # Main
 # =========================================================
 def main():
-    st.title("🩻 " + b("외부 합성 CXR Artifact Checklist 설문", "External Synthetic CXR Artifact Checklist Survey"))
+    st.title("🧪 " + b("교차평가 설문", "Cross-evaluation Survey"))
     st.caption(
         b(
-            "본 설문은 Nano Banana, Sana, ChatGPT Images 2.0, RoentGen-v2로 생성된 합성 CXR의 artifact 유무만 블라인드로 평가합니다.",
-            "This blinded survey records only artifact presence/absence in synthetic CXRs generated by Nano Banana, Sana, ChatGPT Images 2.0, and RoentGen-v2.",
+            "본 설문은 기존 seed label의 신뢰도를 확인하기 위한 블라인드 교차평가입니다. 이미지 출처, 원 평가자, 원 점수는 표시되지 않습니다.",
+            "This survey is a blinded cross-evaluation to assess seed-label reliability. Image source, original rater, and original scores are hidden."
         )
     )
 
+    # Sidebar
     st.sidebar.header(b("참여자 설정", "Participant Setup"))
-    reader_id = st.sidebar.selectbox(
-        b("평가자 코드", "Reader ID"),
-        options=READER_OPTIONS,
+    rater_id = st.sidebar.selectbox(
+        b("평가자 코드", "Rater ID"),
+        options=RATER_OPTIONS,
         index=0,
-        format_func=lambda x: f"{READER_CONFIG[x]['display_name']}",
+        format_func=lambda x: f"{x} - {RATER_CONFIG[x]['display_name']}"
     )
 
-    if st.session_state.get("active_reader_id") != reader_id:
-        st.session_state["active_reader_id"] = reader_id
-        st.session_state["timer_assignment_id"] = None
+    # rater 변경 시 state 초기화
+    if st.session_state.get("active_rater_id") != rater_id:
+        st.session_state["active_rater_id"] = rater_id
+        st.session_state["timer_case_idx"] = None
         st.session_state["case_start_time"] = time.time()
         st.session_state["current_index"] = 0
 
     consent = st.sidebar.checkbox(b("연구 안내를 읽었습니다.", "I have read the study information."))
     if not consent:
-        st.warning(b("설문을 진행하려면 동의 체크가 필요합니다.", "Please check consent to proceed."))
+        st.warning(
+            b(
+                "설문을 진행하려면 동의 체크가 필요합니다.",
+                "You must check consent to proceed."
+            )
+        )
         st.stop()
 
     st.sidebar.divider()
     st.sidebar.markdown("**" + b("평가 원칙", "Rating Principles") + "**")
-    st.sidebar.markdown("- " + b("generator, prompt, 병명, 나이, 성별, cross-validation 여부는 화면에서 블라인드 처리됩니다.", "Generator, prompt, disease, age, sex, and cross-validation role are blinded on screen."))
-    st.sidebar.markdown("- " + b("질병 진단 정확도나 release 여부가 아니라, 아래 artifact 유무만 평가합니다.", "Do not rate diagnosis accuracy or release suitability; only rate the artifact checklist below."))
-    st.sidebar.markdown("- " + b("각 항목은 반드시 X/O/N/A 중 하나를 선택해주세요.", "For each artifact, select exactly one of X/O/N/A."))
+    st.sidebar.markdown("- " + b("질병 유무를 판독하는 설문이 아닙니다.", "This is not a disease detection/diagnosis task."))
+    st.sidebar.markdown("- " + b("오로지 **합성 흔적/현실감/공유·학습 적합성** 관점에서 평가해주세요.",
+                                 "Please rate ONLY based on **synthetic artifacts/realism/suitability for sharing & training**."))
+    st.sidebar.markdown("- " + b("원 평가자, 기존 점수, hidden HQ/LQ는 화면에 표시되지 않습니다.",
+                                 "Original rater, prior scores, and hidden HQ/LQ are not shown on screen."))
 
+    # Load cases from manifest
     try:
-        all_rows, assignment_path = load_assignment()
+        assigned_cases, manifest_path = build_case_list_for_rater(rater_id)
     except Exception as e:
-        st.error(b("assignment manifest 로딩 실패", "Assignment manifest loading failed") + f": {e}")
+        st.error(b("케이스 로딩 실패", "Case loading failed") + f": {e}")
         st.stop()
 
-    assigned_cases = [r for r in all_rows if r.get("reader_id") == reader_id]
-    assigned_cases = sorted(assigned_cases, key=lambda x: int(x["reader_sequence"]))
     total_cases = len(assigned_cases)
-    if total_cases != 100:
-        st.sidebar.warning(b("이 평가자의 케이스 수가 100장이 아닙니다", "This reader does not have exactly 100 cases") + f": {total_cases}")
-    else:
-        st.sidebar.success(b("할당 케이스", "Assigned cases") + f": {total_cases}")
+    # st.sidebar.success(b("케이스 목록 로딩 완료", "Case manifest loaded") + f": {os.path.basename(manifest_path)}")
+    st.sidebar.caption(b("총 케이스 수", "Total cases") + f": {total_cases}")
 
-    sheet = get_google_sheet(reader_id)
+    # Google Sheet
+    sheet = get_google_sheet(rater_id)
     if sheet:
         ensure_sheet_header(sheet)
-        st.sidebar.caption(b("Google Sheet 연결됨", "Google Sheet connected") + f": {SHEET_NAME}/{READER_CONFIG[reader_id]['worksheet_name']}")
-        st.sidebar.caption(b("주의: Sheet에는 hidden metadata가 저장됩니다. 평가자와 공유하지 마세요.", "Note: Sheet stores hidden metadata. Do not share it with readers."))
-    else:
-        st.sidebar.warning(b("Google Sheet 미연결: local CSV로 저장합니다.", "Google Sheet not connected: saving to local CSV."))
-        st.sidebar.caption(local_result_path(reader_id))
+        # st.sidebar.success(b("Google Sheet 연결됨", "Connected to Google Sheet") + f": {sheet.spreadsheet.title} / {sheet.title}")
 
-    processed_ids = load_processed_assignment_ids(sheet, reader_id)
+    processed_ids = load_processed_image_ids(sheet, rater_id)
+
+    # Find first unprocessed index
     start_index = total_cases
     for i, c in enumerate(assigned_cases):
-        if c["assignment_id"] not in processed_ids:
+        img_id = c["image_id"]
+        if img_id not in processed_ids:
             start_index = i
             break
+
     st.session_state["current_index"] = start_index
 
+    # Done?
     if st.session_state["current_index"] >= total_cases:
-        st.success(b("🎉 모든 평가 케이스가 완료되었습니다. 감사합니다!", "🎉 All assigned cases are complete. Thank you!"))
+        st.success(
+            b(
+                "🎉 모든 교차평가 케이스가 완료되었습니다. 감사합니다!",
+                "🎉 You have completed all cross-evaluation cases. Thank you!"
+            )
+        )
         st.balloons()
         return
 
+    # Current case
     current_idx = st.session_state["current_index"]
     case = assigned_cases[current_idx]
-    assignment_id = case["assignment_id"]
-    case_hash = case.get("case_hash") or hashlib.sha1(assignment_id.encode()).hexdigest()[:10]
-    image_path = resolve_image_path(case)
+    image_path = case["path"]
+    image_id = case["image_id"]
+    case_hash = hash_case(image_id)
 
-    if st.session_state.get("timer_assignment_id") != assignment_id:
-        st.session_state["timer_assignment_id"] = assignment_id
+    # Timer init
+    if st.session_state.get("timer_case_idx") != current_idx:
+        st.session_state["timer_case_idx"] = current_idx
         st.session_state["case_start_time"] = time.time()
 
-    st.progress(current_idx / max(total_cases, 1))
-    col_p1, col_p2, col_p3 = st.columns([1, 1, 1])
-    with col_p1:
+    # Progress UI
+    st.progress(current_idx / total_cases)
+    col1, col2 = st.columns([1, 1])
+    with col1:
         st.caption(b("진행", "Progress") + f": **{current_idx + 1} / {total_cases}**")
-    with col_p2:
-        st.caption(b("블라인드 이미지 ID", "Blinded image ID") + f": `{case['blinded_image_id']}`")
-    with col_p3:
+    with col2:
         st.caption(f"Case ID: `{case_hash}`")
     st.divider()
 
-    if not image_path or not os.path.exists(image_path):
+    if not os.path.exists(image_path):
         st.error(
             b(
-                "이미지 파일을 찾지 못했습니다. image_root와 gpt/gemini/roentgen/sana 폴더 위치를 확인해주세요.",
-                "Image file not found. Please check image_root and gpt/gemini/roentgen/sana folder paths.",
+                "이미지 파일을 찾지 못했습니다. manifest의 image_id 경로 또는 실행 위치를 확인해주세요.",
+                "Image file not found. Please check the image_id path in the manifest or the app working directory."
             )
             + f"\n\n`{image_path}`"
         )
         st.stop()
 
-    col_left, col_right = st.columns([1.05, 0.95], gap="large")
+    col_left, col_right = st.columns([1, 1], gap="large")
 
     with col_left:
         st.subheader(b("평가 대상 이미지", "Target Image"))
-        img = resize_image_pil(image_path, max_height=1050)
-        if img is not None:
-            st.image(img, use_container_width=True)
-        else:
-            st.image(image_path, use_container_width=True)
-        st.caption(b("화면에는 generator/prompt/병명/나이/성별/cross-validation 여부가 표시되지 않습니다.", "Generator/prompt/disease/age/sex/cross-validation role are intentionally not shown."))
+        st.image(image_path, use_container_width=True)
 
     with col_right:
-        st.subheader("📝 " + b("Artifact checklist", "Artifact checklist"))
-        qa_box = st.container(height=790, border=True)
+        st.subheader("📝 " + b("평가 입력 (QA 목적)", "Rating Form (QA purpose)"))
+
+        qa_box = st.container(height=720, border=True)
+
         with qa_box:
-            with st.form(key=f"form_{reader_id}_{assignment_id}"):
-                st.caption(b("각 artifact 항목에 대해 X/O/N/A만 선택해주세요.", "For each artifact, select X/O/N/A only."))
-                artifact_values = {}
-                for art in ARTIFACTS:
-                    artifact_values[art["key"]] = artifact_radio(art, assignment_id)
-                    st.markdown("")
+            with st.form(key=f"form_{rater_id}_{case_hash}"):
+
+                with st.expander(b("품질 점수 기준(1–5) 보기", "Show quality score criteria (1–5)"), expanded=False):
+                    st.markdown(
+                        "- **" + b("1점(매우 낮음)", "1 (Very Low)") + "**: " + b("합성 흔적/비현실성이 뚜렷하여 데이터로 쓰기 어려움",
+                                                                                    "Obvious synthetic artifacts/unrealism; hard to use as data") + "\n"
+                        "- **" + b("2점(낮음)", "2 (Low)") + "**: " + b("인공적인 흔적이 자주 보여 품질이 낮다고 판단",
+                                                                      "Frequent artificial artifacts; low quality") + "\n"
+                        "- **" + b("3점(보통/애매)", "3 (Borderline)") + "**: " + b("일부는 자연스럽지만 일부는 의심/불일치(경계선)",
+                                                                                  "Some parts look natural, others suspicious/inconsistent") + "\n"
+                        "- **" + b("4점(높음)", "4 (High)") + "**: " + b("대부분 자연스럽고 데이터로 활용 가능해 보임",
+                                                                       "Mostly natural; appears usable for data") + "\n"
+                        "- **" + b("5점(매우 높음)", "5 (Very High)") + "**: " + b("실제와 구별이 매우 어렵고 전반적으로 매우 자연스러움",
+                                                                                 "Very hard to distinguish from real; highly natural overall")
+                    )
+
+                quality_score = st.selectbox(
+                    b("A) 합성 CXR 품질 점수 (1–5)", "A) Synthetic CXR quality score (1–5)"),
+                    options=[b("선택", "Select"), "1", "2", "3", "4", "5"],
+                    index=0,
+                    key=f"quality_{case_hash}",
+                )
+
+                release = st.selectbox(
+                    b("B) 데이터 공유/학습에 사용 가능(Release 추천) 여부",
+                      "B) Suitable for sharing/training (Release recommendation)"),
+                    options=[b("선택", "Select"), "Yes", "No"],
+                    index=0,
+                    key=f"release_{case_hash}",
+                )
 
                 st.markdown("---")
-                confirm_all_checked = st.checkbox(
-                    b("위 8개 artifact 항목을 모두 확인했습니다.", "I have reviewed all 8 artifact items."),
-                    key=f"confirm_{assignment_id}",
+                st.markdown("##### **" + b("C) 합성 흔적(artifact) 체크리스트 (O/X/N/A)",
+                                         "C) Synthetic artifact checklist (O/X/N/A)") + "**")
+                st.caption(b("각 항목은 ‘있음(O) / 없음(X) / 판단 불가(N/A)’ 중 하나를 선택해주세요.",
+                             "For each item, choose one: Present (O) / None (X) / Unable to judge (N/A)."))
+
+                a_marker = artifact_radio(
+                    "1) 위치 마커(L/R) 오류 (Marker Artifacts)",
+                    "1) Incorrect position marker (L/R) (Marker Artifacts)",
+                    "L/R 마커 반전, 위치 이상, 글자 형태 부자연스러움 등",
+                    "Reversed L/R, abnormal placement, unnatural typography, etc.",
+                    key_prefix=f"art_marker_{case_hash}",
+                    example_key="marker_error"
                 )
-                submit = st.form_submit_button(b("💾 저장하고 다음으로", "💾 Save & Next"), type="primary", use_container_width=True)
+                a_density = artifact_radio(
+                    "2) 비현실적 투과도/밀도 (Density & Penetration)",
+                    "2) Unrealistic density/penetration (Density & Penetration)",
+                    "얼룩, 물리적으로 어색한 밀도 표현(예: 뼈가 가장 하얗게 보이지 않음 등)",
+                    "Blotches or physically implausible density (e.g., bones not appearing as the whitest structure)",
+                    key_prefix=f"art_density_{case_hash}",
+                    example_key="density_penetration"
+                )
+                a_gas = artifact_radio(
+                    "3) 위장관/복부 가스 음영 오류 (Abnormal Gas Pattern)",
+                    "3) Abnormal GI/abdominal gas shadow (Abnormal Gas Pattern)",
+                    "하부 흉부/상복부 음영이 비현실적(가스/음영 패턴 이상)",
+                    "Unrealistic lower chest/upper abdomen shadow (abnormal gas/opacities)",
+                    key_prefix=f"art_gas_{case_hash}",
+                    example_key="abnormal_gas"
+                )
+
+                st.markdown("---")
+
+                a_boundary = artifact_radio(
+                    "4) 구조물 경계 모호 (Vague Boundaries)",
+                    "4) Vague structural boundaries (Vague Boundaries)",
+                    "피부/장기/뼈 윤곽 경계가 전반적으로 흐리거나 붕괴",
+                    "Overall blurred/collapsed outlines of skin/organs/bones",
+                    key_prefix=f"art_boundary_{case_hash}",
+                    example_key="vague_boundaries"
+                )
+                a_ribs = artifact_radio(
+                    "5) 전방 늑골 소실/끊김 (Anterior Ribs)",
+                    "5) Missing/broken anterior ribs (Anterior Ribs)",
+                    "후방 늑골은 보이는데 전방 늑골이 약하거나 끊김",
+                    "Posterior ribs visible but anterior ribs are weak/discontinuous",
+                    key_prefix=f"art_ribs_{case_hash}",
+                    example_key="anterior_ribs"
+                )
+                a_clavicle = artifact_radio(
+                    "6) 쇄골 형태 이상 (Wavy clavicle)",
+                    "6) Abnormal clavicle shape (Wavy clavicle)",
+                    "쇄골 라인이 울퉁불퉁/물결 모양으로 부자연스러움",
+                    "Clavicle line looks bumpy/wavy and unnatural",
+                    key_prefix=f"art_clavicle_{case_hash}",
+                    example_key="wavy_clavicle"
+                )
+                a_organ = artifact_radio(
+                    "7) 장기 모양 기형 (Abnormal Organ Shape)",
+                    "7) Abnormal organ contour (Abnormal Organ Shape)",
+                    "심장/횡격막 등 장기 윤곽 자체가 비현실적",
+                    "Unrealistic contours of heart/diaphragm, etc.",
+                    key_prefix=f"art_organ_{case_hash}",
+                    example_key="abnormal_organ_shape"
+                )
+
+                st.markdown("---")
+
+                other_flag = st.selectbox(
+                    b("D) 기타(위 항목 외의 부자연스러움) 존재 여부",
+                      "D) Other unnatural findings (not listed above)"),
+                    options=[b("선택", "Select"), "Yes", "No"],
+                    index=0,
+                    key=f"other_{case_hash}",
+                )
+
+                comment = st.text_area(
+                    b("E) (선택) 코멘트 1줄 — 부자연스러운 부위/이유를 짧게 기록",
+                      "E) (Optional) One-line comment — location/reason of unnaturalness"),
+                    height=90,
+                    placeholder=b("예: 우측 상폐야 경계가 비정상적으로 뭉개짐.",
+                                  "e.g., Right upper lung boundary is unnaturally blurred."),
+                    key=f"comment_{case_hash}",
+                )
+
+                confirm_all_checked = st.checkbox(
+                    b("위 7개 artifact 항목을 모두 확인했습니다.",
+                      "I have reviewed all 7 artifact items above."),
+                    key=f"confirm_{case_hash}"
+                )
+
+                submit = st.form_submit_button(
+                    b("💾 저장하고 다음으로", "💾 Save & Next"),
+                    type="primary",
+                    use_container_width=True
+                )
 
         if submit:
             errors = []
-            for art in ARTIFACTS:
-                if artifact_values.get(art["key"], "") == "":
-                    errors.append(b(f"'{art['ko']}' 항목을 선택해주세요.", f"Please select '{art['en']}'."))
+            if quality_score == b("선택", "Select"):
+                errors.append(b("품질 점수(1–5)를 선택해주세요.", "Please select a quality score (1–5)."))
+            if release == b("선택", "Select"):
+                errors.append(b("Release 추천(Yes/No)을 선택해주세요.", "Please select Release recommendation (Yes/No)."))
+            if other_flag == b("선택", "Select"):
+                errors.append(b("기타 여부(Yes/No)를 선택해주세요.", "Please select Other flag (Yes/No)."))
+            if (other_flag == "Yes") and (not comment.strip()):
+                errors.append(b("'기타=Yes'인 경우 코멘트를 1줄 작성해주세요.",
+                                "If 'Other=Yes', please write a one-line comment."))
             if not confirm_all_checked:
-                errors.append(b("artifact 8개 항목 확인 체크가 필요합니다.", "Please confirm all 8 artifact items were reviewed."))
+                errors.append(b("artifact 7개 항목 확인 체크가 필요합니다.",
+                                "Please confirm you reviewed all 7 artifact items."))
 
             if errors:
                 for e in errors:
@@ -514,34 +591,48 @@ def main():
             else:
                 elapsed = max(0.0, time.time() - st.session_state.get("case_start_time", time.time()))
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
                 row = [
                     timestamp,
                     STUDY_ID,
                     APP_VERSION,
-                    reader_id,
-                    assignment_id,
-                    str(case["reader_sequence"]),
-                    case["blinded_image_id"],
-                    case["blinded_filename"],
+                    rater_id,
+                    str(case["blind_case_order"]),
                     case_hash,
+                    image_id,
+                    case["source_quality_hidden"],
+                    case["original_rater"],
+                    case["selection_bucket"],
+                    case["selection_note"],
+                    case["original_score"],
+                    case["original_release"],
+                    case["original_case_order"],
+                    quality_score,
+                    release,
+                    a_marker,
+                    a_density,
+                    a_gas,
+                    a_boundary,
+                    a_ribs,
+                    a_clavicle,
+                    a_organ,
+                    other_flag,
+                    comment.strip(),
+                    f"{elapsed:.2f}",
                 ]
-                row += build_source_metadata(case)
-                row += [artifact_values[a["key"]] for a in ARTIFACTS]
-                row += [f"{elapsed:.2f}"]
 
-                saved_to_sheet = False
                 if sheet:
                     try:
                         sheet.append_row(row)
-                        saved_to_sheet = True
+                        st.toast(b("✅ 저장 완료", "✅ Saved") + f" (Case {current_idx + 1}/{total_cases})")
+                        st.rerun()
                     except Exception as e:
-                        st.error(b("Google Sheet 저장 중 오류. local CSV에도 저장합니다.", "Google Sheet save failed. Saving to local CSV as backup.") + f": {e}")
-                append_local_result(reader_id, row)
-                if saved_to_sheet:
-                    st.toast(b("✅ 저장 완료", "✅ Saved") + f" ({current_idx + 1}/{total_cases})")
+                        st.error(b("구글 시트 저장 중 오류", "Error while saving to Google Sheet") + f": {e}")
                 else:
-                    st.toast(b("✅ local CSV 저장 완료", "✅ Saved to local CSV") + f" ({current_idx + 1}/{total_cases})")
-                st.rerun()
+                    st.warning(b("⚠️ 구글 시트가 연결되지 않았습니다(테스트 모드).",
+                                 "⚠️ Google Sheet not connected (test mode)."))
+                    st.info(b("저장 데이터 미리보기", "Preview saved row") + f":\n{row}")
+                    st.rerun()
 
 
 if __name__ == "__main__":
